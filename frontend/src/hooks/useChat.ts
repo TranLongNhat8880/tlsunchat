@@ -131,7 +131,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
   const socketRef = useRef<Socket | null>(null);
 
   const computeUnreadForRoom = (roomId: string, lastMsgObj: any, isSelected: boolean) => {
-    if (isSelected) return 0;
+    const isPageActive = typeof document !== 'undefined' && document.hasFocus() && !document.hidden;
+    const shouldBeRead = isSelected && isPageActive;
+    if (shouldBeRead) return 0;
     if (!lastMsgObj) return 0;
     if (!currentUser?.id) return 0;
 
@@ -298,9 +300,10 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
               if (newMsg.senderId === currentUser?.id) lastMsgText = `Bạn: ${lastMsgText}`;
             }
 
-            const nextUnread = isSelected ? 0 : (isMine ? c.unread : c.unread + 1);
+            const isPageActive = typeof document !== 'undefined' && document.hasFocus() && !document.hidden;
+            const nextUnread = (isSelected && isPageActive) ? 0 : (isMine ? c.unread : c.unread + 1);
             if (currentUser?.id) {
-              if (isSelected || isMine) {
+              if ((isSelected && isPageActive) || isMine) {
                 setStoredRoomState(currentUser.id, c.id, Date.now(), 0);
               } else {
                 const states = getStoredRoomStates(currentUser.id);
@@ -609,6 +612,25 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     // Emit join_room cho Socket
     socketRef.current?.emit('join_room', selectedConvId);
   }, [selectedConvId]);
+
+  // Reset unread count of active room when window gains focus or page becomes visible
+  useEffect(() => {
+    const handleFocus = () => {
+      if (selectedConvId && currentUser?.id) {
+        setConversations(prev => prev.map(c => c.id === selectedConvId ? { ...c, unread: 0 } : c));
+        setStoredRoomState(currentUser.id, selectedConvId, Date.now(), 0);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [selectedConvId, currentUser?.id]);
 
   // 3. Hàm gửi tin nhắn
   const sendMessage = (roomId: string, content: string, type: 'text' | 'file' | 'image' | 'video' = 'text', replyToId: string | null = null) => {
