@@ -71,9 +71,9 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     setIsEnablingPush(true);
     try {
       await registerPushNotifications();
-      alert('Da bat thong bao cho thiet bi nay!');
+      alert('Đã bật thông báo cho thiết bị này!');
     } catch (error: any) {
-      alert(error.message || 'Khong the bat thong bao tren thiet bi nay');
+      alert(error.message || 'Không thể bật thông báo trên thiết bị này');
     } finally {
       setIsEnablingPush(false);
     }
@@ -174,8 +174,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                     <Bell className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">Thong bao tren thiet bi</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Bam nut nay sau khi cai PWA tren dien thoai de nhan thong bao khi co tin nhan moi.</p>
+                    <p className="text-sm font-semibold text-gray-800">Thông báo trên thiết bị</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Bấm nút này sau khi cài PWA trên điện thoại để nhận thông báo khi có tin nhắn mới.</p>
                   </div>
                 </div>
                 <button
@@ -187,7 +187,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                   {isEnablingPush ? (
                     <div className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" />
                   ) : (
-                    <><Bell className="w-4 h-4" /> Bat thong bao</>
+                    <><Bell className="w-4 h-4" /> Bật thông báo</>
                   )}
                 </button>
               </div>

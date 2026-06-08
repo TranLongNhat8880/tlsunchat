@@ -25,7 +25,7 @@ export function LoginPage() {
       login(token, data.user, requirePasswordChange);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Dang nhap that bai. Vui long thu lai.');
+      setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -42,13 +42,13 @@ export function LoginPage() {
             InternalChat
           </h1>
           <p className="text-gray-500 mt-1" style={{ fontSize: '0.875rem' }}>
-            He thong tro chuyen noi bo doanh nghiep
+            Hệ thống trò chuyện nội bộ doanh nghiệp
           </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl shadow-green-100/50 p-6 border border-green-100">
           <h2 className="text-gray-800 mb-5" style={{ fontSize: '1.125rem', fontWeight: 600 }}>
-            Dang nhap
+            Đăng nhập
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -78,7 +78,7 @@ export function LoginPage() {
                 className="block text-gray-600 mb-1.5"
                 style={{ fontSize: '0.875rem', fontWeight: 500 }}
               >
-                Mat khau
+                Mật khẩu
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -117,14 +117,14 @@ export function LoginPage() {
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                'Dang nhap'
+                'Đăng nhập'
               )}
             </button>
           </form>
         </div>
 
         <p className="text-center text-gray-400 mt-5" style={{ fontSize: '0.75rem' }}>
-          Du lieu duoc ma hoa va bao mat - v1.0.0
+          Dữ liệu được mã hóa và bảo mật - v1.0.0
         </p>
       </div>
     </div>
