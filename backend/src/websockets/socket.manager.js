@@ -1,6 +1,7 @@
 const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
 const chatModel = require('../features/chat/chat.model');
+const pushService = require('../features/push/push.service');
 const supabase = require('../config/database');
 const { getPasswordTokenVersion } = require('../core/utils/tokenFingerprint');
 
@@ -125,6 +126,31 @@ const init = (server) => {
           members.forEach((member) => {
             io.to(member.user_id).emit('receive_message', newMessage);
           });
+
+          const recipientIds = members
+            .map(member => member.user_id)
+            .filter(userId => userId !== senderId);
+
+          if (recipientIds.length > 0) {
+            const senderName = newMessage.users?.name || 'TLSunChat';
+            const body = type === 'file'
+              ? 'Da gui mot tep tin'
+              : type === 'image'
+                ? 'Da gui mot hinh anh'
+                : type === 'video'
+                  ? 'Da gui mot video'
+                  : content;
+
+            pushService.sendPushToUsers(recipientIds, {
+              title: `Tin nhan tu ${senderName}`,
+              body,
+              icon: newMessage.users?.avatar || '/pwa-192x192.png',
+              tag: `message-${newMessage.id}`,
+              url: '/'
+            }).catch(error => {
+              console.error('Failed to queue push notification:', error.message);
+            });
+          }
         }
 
         if (callback) callback({ status: 'success', message: newMessage });

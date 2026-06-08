@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import api from '../lib/api';
+import { registerPushNotifications } from '../lib/pushNotifications';
 import type { User, Conversation, Message } from '../types/index';
 
 const getDirectFileUrl = (fileId: string) => {
@@ -122,8 +123,10 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     if (!token) return;
 
     // Xin quyền Notification
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    if ('Notification' in window && Notification.permission === 'granted') {
+      registerPushNotifications().catch(error => {
+        console.warn('Push notification registration failed:', error);
+      });
     }
 
     // Connect socket

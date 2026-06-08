@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Lock, User as UserIcon, Save } from 'lucide-react';
+import { X, Lock, User as UserIcon, Save, Bell } from 'lucide-react';
 import api from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { registerPushNotifications } from '../../lib/pushNotifications';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -20,6 +21,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isEnablingPush, setIsEnablingPush] = useState(false);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +64,18 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
       alert(error.response?.data?.message || 'Lỗi khi đổi mật khẩu');
     } finally {
       setIsUpdatingPassword(false);
+    }
+  };
+
+  const handleEnableNotifications = async () => {
+    setIsEnablingPush(true);
+    try {
+      await registerPushNotifications();
+      alert('Da bat thong bao cho thiet bi nay!');
+    } catch (error: any) {
+      alert(error.message || 'Khong the bat thong bao tren thiet bi nay');
+    } finally {
+      setIsEnablingPush(false);
     }
   };
 
@@ -154,6 +168,30 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
           {activeTab === 'security' && (
             <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="p-4 rounded-xl border border-green-100 bg-green-50/60">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+                    <Bell className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800">Thong bao tren thiet bi</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Bam nut nay sau khi cai PWA tren dien thoai de nhan thong bao khi co tin nhan moi.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleEnableNotifications}
+                  disabled={isEnablingPush}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-green-200 hover:bg-green-50 disabled:opacity-60 text-green-700 rounded-xl font-medium transition-colors text-sm"
+                >
+                  {isEnablingPush ? (
+                    <div className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" />
+                  ) : (
+                    <><Bell className="w-4 h-4" /> Bat thong bao</>
+                  )}
+                </button>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Mật khẩu cũ
