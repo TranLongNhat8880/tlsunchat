@@ -19,6 +19,11 @@ self.addEventListener('push', (event) => {
     badge: payload.badge || '/pwa-badge.svg',
     tag: payload.tag || 'tlsunchat-message',
     renotify: true,
+    timestamp: payload.timestamp || Date.now(),
+    vibrate: payload.vibrate || [180, 70, 180],
+    actions: payload.actions || [
+      { action: 'open', title: 'Mo chat' }
+    ],
     data: {
       url: payload.url || '/'
     }

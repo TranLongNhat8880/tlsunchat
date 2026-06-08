@@ -28,9 +28,7 @@ export const registerPushNotifications = async () => {
     throw new Error('Server chua cau hinh VAPID public key');
   }
 
-  const registration = await navigator.serviceWorker.register('/push-sw.js', {
-    scope: '/push/'
-  });
+  const registration = await navigator.serviceWorker.ready;
 
   const existingSubscription = await registration.pushManager.getSubscription();
   const subscription = existingSubscription || await registration.pushManager.subscribe({

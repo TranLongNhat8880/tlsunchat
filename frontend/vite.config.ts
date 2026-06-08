@@ -29,6 +29,9 @@ export default defineConfig({
       devOptions: {
         enabled: true,
       },
+      workbox: {
+        importScripts: ['push-sw.js']
+      },
       manifest: {
         name: 'TLSunChat',
         short_name: 'TLSunChat',

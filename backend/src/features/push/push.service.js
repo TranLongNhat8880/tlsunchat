@@ -24,7 +24,10 @@ exports.subscribe = async (userId, subscription) => {
 
 exports.sendPushNotification = async (subscription, payload) => {
   configureWebPush();
-  return webpush.sendNotification(subscription, JSON.stringify(payload));
+  return webpush.sendNotification(subscription, JSON.stringify(payload), {
+    TTL: 120,
+    urgency: 'high'
+  });
 };
 
 exports.sendPushToUsers = async (userIds, payload) => {
