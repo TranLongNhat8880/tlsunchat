@@ -10,7 +10,8 @@ import { registerPwaUpdate } from "./lib/pwaUpdate.ts";
 registerPwaUpdate();
 
 window.addEventListener('pageshow', (event) => {
-  if (event.persisted) {
+  const root = document.getElementById("root");
+  if (event.persisted && root && root.childElementCount === 0) {
     window.location.reload();
   }
 });

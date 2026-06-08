@@ -4,7 +4,7 @@ export const registerPwaUpdate = () => {
   registerSW({
     immediate: true,
     onNeedRefresh() {
-      window.location.reload();
+      console.info('PWA update is ready. It will apply on the next full app reload.');
     },
     onOfflineReady() {
       console.info('PWA offline cache is ready');

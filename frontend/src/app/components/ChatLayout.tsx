@@ -259,7 +259,7 @@ function MessageBubble({
   return (
     <>
       <div
-        className={`flex items-start gap-2.5 group relative ${isMine ? 'flex-row-reverse' : 'flex-row'}`}
+        className={`flex items-start gap-2.5 group relative min-w-0 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}
         onMouseEnter={openActions}
         onMouseLeave={closeActionsLater}
         onTouchStart={handleTouchStart}
@@ -279,7 +279,7 @@ function MessageBubble({
           </div>
         )}
 
-        <div className={`flex flex-col gap-0.5 max-w-[75%] sm:max-w-[65%] ${isMine ? 'items-end' : 'items-start'}`}>
+        <div className={`flex flex-col gap-0.5 min-w-0 max-w-[75%] sm:max-w-[65%] ${isMine ? 'items-end' : 'items-start'}`}>
           {/* Sender name for group */}
           {!isMine && isGroup && sender && (
             <span className="text-green-600 ml-1" style={{ fontSize: '0.72rem', fontWeight: 600 }}>
@@ -309,7 +309,7 @@ function MessageBubble({
           )}
 
           {/* Bubble */}
-          <div className="relative">
+          <div className="relative min-w-0 max-w-full">
             {isRecalled && (
               <div
                 className={`px-3 py-1.5 rounded-2xl border border-gray-200 bg-gray-100 text-gray-500 italic ${isMine ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
@@ -536,12 +536,12 @@ function MessageBubble({
             {/* Text message */}
             {msg.type === 'text' && !isRecalled && (
               <div
-                className={`px-3.5 py-2 rounded-2xl ${isMine
+                className={`px-3.5 py-2 rounded-2xl max-w-full overflow-hidden ${isMine
                   ? 'bg-green-500 text-white rounded-tr-sm'
                   : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-tl-sm'
                   }`}
               >
-                <p style={{ fontSize: '0.9rem', lineHeight: '1.45' }}>{msg.content}</p>
+                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" style={{ fontSize: '0.9rem', lineHeight: '1.45' }}>{msg.content}</p>
               </div>
             )}
 
@@ -1669,7 +1669,7 @@ export function ChatLayout({
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 bg-gray-50">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-3 bg-gray-50">
             {/* Date separator */}
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-gray-200" />
