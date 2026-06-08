@@ -902,6 +902,7 @@ export function ChatLayout({
     sendMessage,
     sendFileMessage,
     createGroupChat,
+    createRoom,
     togglePin,
     pinMessage,
     reactToMessage,
@@ -1082,6 +1083,21 @@ export function ChatLayout({
     .filter(c => getConvTitle(c).toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
+  const directChatUserIds = new Set(
+    conversations
+      .filter(c => c.type === 'dm')
+      .flatMap(c => c.participants.filter(userId => userId !== currentUser.id))
+  );
+
+  const filteredContacts = users
+    .filter(user => user.id !== currentUser.id && !directChatUserIds.has(user.id))
+    .filter(user => {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) return true;
+      return user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query);
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   const selectConv = (id: string) => {
     clearPendingAttachments();
     closeImageViewer();
@@ -1089,6 +1105,19 @@ export function ChatLayout({
     setMobileShowChat(true);
     setShowInfo(false);
     setReplyTo(null);
+  };
+
+  const startDirectChat = async (userId: string) => {
+    clearPendingAttachments();
+    closeImageViewer();
+    setShowInfo(false);
+    setReplyTo(null);
+
+    const roomId = await createRoom(userId);
+    if (roomId) {
+      setSelectedConvId(roomId);
+      setMobileShowChat(true);
+    }
   };
 
   const scrollToMessage = (messageId: string) => {
@@ -1381,12 +1410,13 @@ export function ChatLayout({
         className="flex-1 overflow-y-auto"
         onClick={() => setShowProfileMenu(false)}
       >
-        {filteredConvs.length === 0 ? (
+        {filteredConvs.length === 0 && filteredContacts.length === 0 ? (
           <div className="text-center text-gray-400 py-8" style={{ fontSize: '0.85rem' }}>
             Không tìm thấy hội thoại
           </div>
         ) : (
-          filteredConvs.map(conv => {
+          <>
+          {filteredConvs.map(conv => {
             const isActive = conv.id === selectedConvId;
             const partner = getPartner(conv);
             const title = getConvTitle(conv);
@@ -1446,7 +1476,38 @@ export function ChatLayout({
                 </div>
               </button>
             );
-          })
+          })}
+          {filteredContacts.length > 0 && (
+            <div className="px-3 pt-3 pb-1 text-gray-400 uppercase tracking-wide" style={{ fontSize: '0.68rem', fontWeight: 700 }}>
+              Đồng nghiệp
+            </div>
+          )}
+          {filteredContacts.map(user => (
+            <button
+              key={user.id}
+              onClick={() => startDirectChat(user.id)}
+              className="w-full flex items-center gap-3 px-3 py-3 transition-colors text-left hover:bg-green-100/60"
+            >
+              <Avatar user={user} size="md" showStatus />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span
+                    className="text-gray-800 truncate"
+                    style={{ fontSize: '0.88rem', fontWeight: 500 }}
+                  >
+                    {user.name}
+                  </span>
+                  <span className="flex-shrink-0 ml-1 text-green-600" style={{ fontSize: '0.68rem', fontWeight: 600 }}>
+                    Mới
+                  </span>
+                </div>
+                <p className="truncate text-gray-400 mt-0.5" style={{ fontSize: '0.78rem', fontWeight: 400 }}>
+                  Bắt đầu trò chuyện
+                </p>
+              </div>
+            </button>
+          ))}
+          </>
         )}
       </div>
 
