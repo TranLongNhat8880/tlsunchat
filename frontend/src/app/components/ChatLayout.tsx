@@ -1448,8 +1448,8 @@ export function ChatLayout({
                 key={conv.id}
                 onClick={() => selectConv(conv.id)}
                 className={`w-full flex items-center gap-3 px-3 py-3 transition-colors text-left ${isActive
-                  ? 'bg-green-100 border-r-2 border-green-500'
-                  : 'hover:bg-green-100/60'
+                  ? 'md:bg-green-100 md:border-r-2 md:border-green-500'
+                  : 'md:hover:bg-green-100/60'
                   }`}
               >
                 {/* Avatar */}
@@ -1508,7 +1508,7 @@ export function ChatLayout({
             <button
               key={user.id}
               onClick={() => startDirectChat(user.id)}
-              className="w-full flex items-center gap-3 px-3 py-3 transition-colors text-left hover:bg-green-100/60"
+              className="w-full flex items-center gap-3 px-3 py-3 transition-colors text-left md:hover:bg-green-100/60"
             >
               <Avatar user={user} size="md" showStatus />
               <div className="flex-1 min-w-0">
