@@ -226,13 +226,19 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
         
         // 🔔 Hiển thị thông báo & Phát âm thanh
         if (currentUser && newMsg.senderId !== currentUser.id) {
-          const isNotFocused = document.hidden || selectedConvIdRef.current !== newMsg.conversationId;
-          if (isNotFocused && 'Notification' in window && Notification.permission === 'granted') {
+          const inDifferentRoom = selectedConvIdRef.current !== newMsg.conversationId;
+          const isBackground = document.hidden;
+
+          if (isBackground || inDifferentRoom) {
+            notificationAudio.play().catch(e => console.log('Không thể phát âm thanh:', e));
+          }
+
+          // Chỉ hiển thị Notification từ frontend nếu app đang FOCUSED nhưng ở khác phòng.
+          // Nếu app ở background (hidden), Service Worker (Web Push) sẽ hiển thị thông báo thay thế.
+          if (!isBackground && inDifferentRoom && 'Notification' in window && Notification.permission === 'granted') {
             const sender = usersRef.current.find(u => u.id === newMsg.senderId);
             const senderName = sender?.name || 'Ai đó';
             const body = newMsg.type === 'file' ? '📎 Gửi một tệp tin' : newMsg.type === 'image' ? '🖼️ Gửi một hình ảnh' : newMsg.content;
-            
-            notificationAudio.play().catch(e => console.log('Không thể phát âm thanh:', e));
             
             const notification = new Notification(`Tin nhắn từ ${senderName}`, {
               body,
