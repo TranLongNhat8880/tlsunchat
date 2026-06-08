@@ -4,7 +4,6 @@ import { ChatLayout } from './components/ChatLayout';
 import { AdminPanel } from './components/AdminPanel';
 import { ForceChangePassword } from './components/ForceChangePassword';
 import { useAuth } from '../contexts/AuthContext';
-import { USERS } from './mockData';
 
 // --- Tạm thời export Types từ đây để không phá vỡ code ChatLayout cũ ---
 export * from '../types';

@@ -8,7 +8,7 @@ const configureWebPush = () => {
   }
 
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:admin@tlsunchat.com',
+    process.env.VAPID_SUBJECT || 'https://tlsunchat.vercel.app',
     process.env.VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   );
