@@ -230,7 +230,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
                 participants,
                 lastMessage: lastMsgText,
                 lastTime: isNewRoom ? newMsg.timestamp : '',
-                unread: isNewRoom && !isSelected ? 1 : 0,
+                unread: isNewRoom && !isSelected && newMsg.senderId !== currentUser?.id ? 1 : 0,
                 isPinned: r.is_pinned || false
               };
             });
@@ -242,6 +242,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
         return prevConvs.map(c => {
           if (c.id === newMsg.conversationId) {
             const isSelected = c.id === selectedConvIdRef.current;
+            const isMine = newMsg.senderId === currentUser?.id;
             let lastMsgText = '';
             if (newMsg.content === '__MESSAGE_RECALLED__') lastMsgText = 'Tin nhắn đã bị thu hồi';
             else {
@@ -254,7 +255,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
               lastMessage: lastMsgText,
               lastTime: newMsg.timestamp,
               updatedAt: Date.now(),
-              unread: isSelected ? 0 : c.unread + 1
+              unread: isSelected ? 0 : isMine ? c.unread : c.unread + 1
             };
           }
           return c;
