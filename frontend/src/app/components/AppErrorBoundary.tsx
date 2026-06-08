@@ -8,15 +8,43 @@ type State = {
   hasError: boolean;
 };
 
+const RECOVERY_KEY = 'tlsunchat:error-recovery';
+const LAST_ERROR_KEY = 'tlsunchat:last-error';
+
 export class AppErrorBoundary extends React.Component<Props, State> {
   state: State = { hasError: false };
+  private recoveryClearTimer: number | null = null;
 
   static getDerivedStateFromError() {
     return { hasError: true };
   }
 
-  componentDidCatch(error: unknown) {
-    console.error('App crashed:', error);
+  componentDidMount() {
+    this.recoveryClearTimer = window.setTimeout(() => {
+      if (!this.state.hasError) sessionStorage.removeItem(RECOVERY_KEY);
+    }, 5000);
+  }
+
+  componentWillUnmount() {
+    if (this.recoveryClearTimer) window.clearTimeout(this.recoveryClearTimer);
+  }
+
+  componentDidCatch(error: unknown, errorInfo: React.ErrorInfo) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+
+    console.error('App crashed:', error, errorInfo);
+    localStorage.setItem(LAST_ERROR_KEY, JSON.stringify({
+      message,
+      stack,
+      componentStack: errorInfo.componentStack,
+      at: new Date().toISOString()
+    }));
+
+    if (sessionStorage.getItem(RECOVERY_KEY) !== '1') {
+      sessionStorage.setItem(RECOVERY_KEY, '1');
+      window.location.reload();
+    }
   }
 
   render() {
@@ -30,7 +58,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
           </div>
           <h1 className="text-gray-900 font-bold text-lg">App can tai lai</h1>
           <p className="text-gray-500 text-sm mt-2">
-            Phien ban hien tai co the dang bi cache cu. Bam tai lai de mo lai app.
+            App vua gap loi khi khoi phuc tu nen. Bam tai lai de mo lai app.
           </p>
           <button
             type="button"
