@@ -156,6 +156,47 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     }
   };
 
+  const formatRoomFromApi = (r: any, selectedId: string | null): Conversation => {
+    const room = r.rooms;
+    const participants = room.room_members?.map((m: any) => m.user_id) || [];
+    const lastMsgObj = r.last_message;
+    let lastMsgText = 'Bắt đầu trò chuyện...';
+    let lastTimeText = '';
+    let updatedAt = 0;
+    
+    if (lastMsgObj) {
+      if (lastMsgObj.content === '__MESSAGE_RECALLED__') {
+        lastMsgText = 'Tin nhắn đã bị thu hồi';
+      } else {
+        lastMsgText = lastMsgObj.type === 'file'
+          ? '📎 File'
+          : lastMsgObj.type === 'image'
+            ? '🖼️ Hình ảnh'
+            : lastMsgObj.type === 'video'
+              ? '🎥 Video'
+              : lastMsgObj.content;
+        if (lastMsgObj.sender_id === currentUser?.id) {
+          lastMsgText = `Bạn: ${lastMsgText}`;
+        }
+      }
+      const msgDate = new Date(lastMsgObj.created_at);
+      lastTimeText = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      updatedAt = msgDate.getTime();
+    }
+
+    return {
+      id: room.id,
+      type: room.type === 'direct' ? 'dm' : 'group',
+      name: room.name || 'Unnamed',
+      participants,
+      lastMessage: lastMsgText,
+      lastTime: lastTimeText,
+      updatedAt,
+      unread: computeUnreadForRoom(room.id, lastMsgObj, room.id === selectedId),
+      isPinned: r.is_pinned || false
+    };
+  };
+
   const selectedConvIdRef = useRef(selectedConvId);
   useEffect(() => {
     selectedConvIdRef.current = selectedConvId;
@@ -173,7 +214,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     if (!token) return;
 
     // Xin quyền Notification
-    if ('Notification' in window && Notification.permission === 'granted') {
+    if ('Notification' in window && (Notification.permission === 'granted' || Notification.permission === 'default')) {
       registerPushNotifications().catch(error => {
         console.warn('Push notification registration failed:', error);
       });
@@ -227,15 +268,15 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
         // 🔔 Hiển thị thông báo & Phát âm thanh
         if (currentUser && newMsg.senderId !== currentUser.id) {
           const inDifferentRoom = selectedConvIdRef.current !== newMsg.conversationId;
-          const isBackground = document.hidden;
+          const isAppFocused = document.hasFocus();
 
-          if (isBackground || inDifferentRoom) {
+          if (!isAppFocused || inDifferentRoom) {
             notificationAudio.play().catch(e => console.log('Không thể phát âm thanh:', e));
           }
 
           // Chỉ hiển thị Notification từ frontend nếu app đang FOCUSED nhưng ở khác phòng.
-          // Nếu app ở background (hidden), Service Worker (Web Push) sẽ hiển thị thông báo thay thế.
-          if (!isBackground && inDifferentRoom && 'Notification' in window && Notification.permission === 'granted') {
+          // Nếu app ở background hoặc mất focus, Service Worker (Web Push) sẽ hiển thị thông báo thay thế.
+          if (isAppFocused && inDifferentRoom && 'Notification' in window && Notification.permission === 'granted') {
             const sender = usersRef.current.find(u => u.id === newMsg.senderId);
             const senderName = sender?.name || 'Ai đó';
             const body = newMsg.type === 'file' ? '📎 Gửi một tệp tin' : newMsg.type === 'image' ? '🖼️ Gửi một hình ảnh' : newMsg.content;
@@ -265,30 +306,12 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
         if (!exists) {
           api.get('/chat/rooms').then(res => {
             const formattedRooms = res.data.data.rooms.map((r: any) => {
-              const room = r.rooms;
-              const participants = room.room_members?.map((m: any) => m.user_id) || [];
-              const isNewRoom = room.id === newMsg.conversationId;
-              const isSelected = room.id === selectedConvIdRef.current;
-              
-              let lastMsgText = '...';
+              const isNewRoom = r.rooms.id === newMsg.conversationId;
+              const formatted = formatRoomFromApi(r, selectedConvIdRef.current);
               if (isNewRoom) {
-                if (newMsg.content === '__MESSAGE_RECALLED__') lastMsgText = 'Tin nhắn đã bị thu hồi';
-                else {
-                  lastMsgText = newMsg.type === 'file' ? '📎 File' : newMsg.type === 'image' ? '🖼️ Hình ảnh' : newMsg.content;
-                  if (newMsg.senderId === currentUser?.id) lastMsgText = `Bạn: ${lastMsgText}`;
-                }
+                formatted.lastTime = newMsg.timestamp;
               }
-
-              return {
-                id: room.id,
-                type: room.type === 'direct' ? 'dm' : 'group',
-                name: room.name || 'Unnamed',
-                participants,
-                lastMessage: lastMsgText,
-                lastTime: isNewRoom ? newMsg.timestamp : '',
-                unread: computeUnreadForRoom(room.id, r.last_message, isSelected),
-                isPinned: r.is_pinned || false
-              };
+              return formatted;
             });
             setConversations(formattedRooms);
           });
@@ -396,38 +419,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       // Cập nhật lại list phòng để Sidebar hiển thị đúng tin nhắn cuối cùng bị thu hồi
       api.get('/chat/rooms').then(res => {
         const rawRooms = res.data.data.rooms;
-        const formattedRooms: Conversation[] = rawRooms.map((r: any) => {
-          const room = r.rooms;
-          const participants = room.room_members?.map((m: any) => m.user_id) || [];
-          const lastMsgObj = r.last_message;
-          let lastMsgText = 'Bắt đầu trò chuyện...';
-          let lastTimeText = '';
-          let updatedAt = 0;
-          if (lastMsgObj) {
-            if (lastMsgObj.content === '__MESSAGE_RECALLED__') {
-              lastMsgText = 'Tin nhắn đã bị thu hồi';
-            } else {
-              lastMsgText = lastMsgObj.type === 'file' ? '📎 File' : lastMsgObj.type === 'image' ? '🖼️ Hình ảnh' : lastMsgObj.content;
-              if (lastMsgObj.sender_id === currentUser?.id) {
-                lastMsgText = `Bạn: ${lastMsgText}`;
-              }
-            }
-            const msgDate = new Date(lastMsgObj.created_at);
-            lastTimeText = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            updatedAt = msgDate.getTime();
-          }
-          return {
-            id: room.id,
-            type: room.type === 'direct' ? 'dm' : 'group',
-            name: room.name || 'Unnamed',
-            participants,
-            lastMessage: lastMsgText,
-            lastTime: lastTimeText,
-            updatedAt,
-            unread: computeUnreadForRoom(room.id, r.last_message, room.id === selectedConvIdRef.current),
-            isPinned: r.is_pinned || false
-          };
-        });
+        const formattedRooms: Conversation[] = rawRooms.map((r: any) => 
+          formatRoomFromApi(r, selectedConvIdRef.current)
+        );
         setConversations(prev => formattedRooms.map(nr => {
           const old = prev.find(p => p.id === nr.id);
           return { ...nr, unread: old ? old.unread : nr.unread };
@@ -439,39 +433,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       // Khi có nhóm mới tạo, fetch lại danh sách nhóm
       api.get('/chat/rooms').then(res => {
         const rawRooms = res.data.data.rooms;
-        const formattedRooms: Conversation[] = rawRooms.map((r: any) => {
-          // Re-use logic từ fetch ban đầu
-          const room = r.rooms;
-          const participants = room.room_members?.map((m: any) => m.user_id) || [];
-          const lastMsgObj = r.last_message;
-          let lastMsgText = 'Bắt đầu trò chuyện...';
-          let lastTimeText = '';
-          let updatedAt = 0;
-          if (lastMsgObj) {
-            if (lastMsgObj.content === '__MESSAGE_RECALLED__') {
-              lastMsgText = 'Tin nhắn đã bị thu hồi';
-            } else {
-              lastMsgText = lastMsgObj.type === 'file' ? '📎 File' : lastMsgObj.type === 'image' ? '🖼️ Hình ảnh' : lastMsgObj.content;
-              if (lastMsgObj.sender_id === currentUser?.id) {
-                lastMsgText = `Bạn: ${lastMsgText}`;
-              }
-            }
-            const msgDate = new Date(lastMsgObj.created_at);
-            lastTimeText = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            updatedAt = msgDate.getTime();
-          }
-          return {
-            id: room.id,
-            type: room.type === 'direct' ? 'dm' : 'group',
-            name: room.name || 'Unnamed',
-            participants,
-            lastMessage: lastMsgText,
-            lastTime: lastTimeText,
-            updatedAt,
-            unread: computeUnreadForRoom(room.id, r.last_message, room.id === selectedConvIdRef.current),
-            isPinned: r.is_pinned || false
-          };
-        });
+        const formattedRooms: Conversation[] = rawRooms.map((r: any) => 
+          formatRoomFromApi(r, selectedConvIdRef.current)
+        );
         setConversations(prev => formattedRooms.map(nr => {
           const old = prev.find(p => p.id === nr.id);
           return { ...nr, unread: old ? old.unread : nr.unread };
@@ -493,40 +457,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
     // Tải danh sách Rooms
     api.get('/chat/rooms').then(res => {
-      const formattedRooms = res.data.data.rooms.map((r: any) => {
-        const room = r.rooms;
-        const participants = room.room_members?.map((m: any) => m.user_id) || [];
-        const lastMsgObj = r.last_message;
-        let lastMsgText = 'Bắt đầu trò chuyện...';
-        let lastTimeText = '';
-        let updatedAt = 0;
-        
-        if (lastMsgObj) {
-          if (lastMsgObj.content === '__MESSAGE_RECALLED__') {
-            lastMsgText = 'Tin nhắn đã bị thu hồi';
-          } else {
-            lastMsgText = lastMsgObj.type === 'file' ? '📎 File' : lastMsgObj.type === 'image' ? '🖼️ Hình ảnh' : lastMsgObj.content;
-            if (lastMsgObj.sender_id === currentUser?.id) {
-              lastMsgText = `Bạn: ${lastMsgText}`;
-            }
-          }
-          const msgDate = new Date(lastMsgObj.created_at);
-          lastTimeText = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          updatedAt = msgDate.getTime();
-        }
-
-        return {
-          id: room.id,
-          type: room.type === 'direct' ? 'dm' : 'group',
-          name: room.name || 'Unnamed',
-          participants,
-          lastMessage: lastMsgText,
-          lastTime: lastTimeText,
-          updatedAt,
-          unread: computeUnreadForRoom(room.id, r.last_message, room.id === selectedConvIdRef.current),
-          isPinned: r.is_pinned || false
-        };
-      });
+      const formattedRooms = res.data.data.rooms.map((r: any) => 
+        formatRoomFromApi(r, selectedConvIdRef.current)
+      );
       setConversations(formattedRooms);
     });
 
@@ -932,29 +865,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
       // Fetch lại để có đầy đủ thông tin users join (do backend trả về)
       const roomsRes = await api.get('/chat/rooms');
-      const formattedRooms = roomsRes.data.data.rooms.map((r: any) => {
-        const room = r.rooms;
-        const participants = room.room_members?.map((m: any) => m.user_id) || [];
-        const lastMsgObj = r.last_message;
-        let lastMsgText = 'Bắt đầu trò chuyện...';
-        let lastTimeText = '';
-
-        if (lastMsgObj) {
-          lastMsgText = lastMsgObj.type === 'file' ? '📎 File' : lastMsgObj.type === 'image' ? '🖼️ Hình ảnh' : lastMsgObj.content;
-          lastTimeText = new Date(lastMsgObj.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-
-        return {
-          id: room.id,
-          type: room.type === 'direct' ? 'dm' : 'group',
-          name: room.name || 'Unnamed',
-          participants,
-          lastMessage: lastMsgText,
-          lastTime: lastTimeText,
-          unread: 0,
-          isPinned: r.is_pinned || false
-        };
-      });
+      const formattedRooms = roomsRes.data.data.rooms.map((r: any) => 
+        formatRoomFromApi(r, selectedConvIdRef.current)
+      );
       setConversations(formattedRooms);
       return roomId;
     } catch (err) {

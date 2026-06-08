@@ -15,7 +15,6 @@ self.addEventListener('push', (event) => {
   const options = {
     body: payload.body || 'Ban co tin nhan moi',
     icon: notificationIcon,
-    image: payload.image || notificationIcon,
     badge: payload.badge || '/pwa-badge.svg',
     tag: payload.tag || 'tlsunchat-message',
     renotify: true,
@@ -28,6 +27,10 @@ self.addEventListener('push', (event) => {
       url: payload.url || '/'
     }
   };
+
+  if (payload.image && payload.image !== notificationIcon) {
+    options.image = payload.image;
+  }
 
   event.waitUntil((async () => {
     const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true });

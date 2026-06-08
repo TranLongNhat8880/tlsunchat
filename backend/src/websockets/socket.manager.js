@@ -149,10 +149,9 @@ const init = (server) => {
               title: `Tin nhan tu ${senderName}`,
               body,
               icon: senderAvatar,
-              image: senderAvatar,
               badge: toPublicAssetUrl('/pwa-badge.svg'),
               tag: `message-${newMessage.id}`,
-              url: '/'
+              url: `/?room=${roomId}`
             }).catch(error => {
               console.error('Failed to queue push notification:', error.message);
             });

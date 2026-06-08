@@ -1,6 +1,16 @@
 const supabase = require('../../config/database');
 
 exports.createSubscription = async (userId, subscription) => {
+  // 1. Xóa các đăng ký trùng endpoint của người dùng khác để tránh rò rỉ thông báo
+  const { error: deleteError } = await supabase
+    .from('push_subscriptions')
+    .delete()
+    .neq('user_id', userId)
+    .contains('subscription', { endpoint: subscription.endpoint });
+
+  if (deleteError) throw new Error(deleteError.message);
+
+  // 2. Tìm subscription hiện tại của chính người dùng này
   const { data: existing, error: findError } = await supabase
     .from('push_subscriptions')
     .select('id')

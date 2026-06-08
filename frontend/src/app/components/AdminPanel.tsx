@@ -60,7 +60,7 @@ function Avatar({ user, size = 'md' }: { user: User; size?: 'sm' | 'md' }) {
 }
 
 // ─── Create User Modal ───────────────────────────────────────────────────────
-function CreateUserModal({ onClose }: { onClose: () => void }) {
+function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess?: () => void }) {
   const [step, setStep] = useState<'form' | 'done'>('form');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -74,7 +74,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
     try {
       await api.post('/auth/create-user', { name, email, role });
       setStep('done');
-      // Tải lại trang hoặc fetch lại list
+      onSuccess?.();
     } catch (error: any) {
       alert(error.response?.data?.message || error.message || 'Có lỗi xảy ra');
     } finally {
@@ -196,6 +196,7 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Users state
   const [usersList, setUsersList] = useState<User[]>([]);
@@ -225,14 +226,14 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
           status: u.is_active ? 'online' : 'offline',
           role: u.role,
           color: 'bg-green-500',
-          initials: u.name.substring(0, 2).toUpperCase()
+          initials: (u.name || '').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
         }));
         setUsersList(formatted);
         setUsersTotalPages(pagination.totalPages);
         setUsersTotal(pagination.total);
       }).catch(err => console.error(err));
     }
-  }, [tab, usersPage, search]);
+  }, [tab, usersPage, search, refreshTrigger]);
 
   // Reset page when search changes
   useEffect(() => {
@@ -617,7 +618,15 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
       </div>
 
       {/* Create user modal */}
-      {showCreateModal && <CreateUserModal onClose={() => setShowCreateModal(false)} />}
+      {showCreateModal && (
+        <CreateUserModal 
+          onClose={() => setShowCreateModal(false)} 
+          onSuccess={() => {
+            setUsersPage(1);
+            setRefreshTrigger(prev => prev + 1);
+          }} 
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   MessageCircle, Search, LogOut, ChevronLeft, Send, Paperclip, Smile,
   MoreVertical, CheckCheck, Check, Reply, Download, Users, X,
@@ -867,8 +868,23 @@ export function ChatLayout({
   onLogout,
   onOpenAdmin,
 }: Props) {
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedConvId = searchParams.get('room');
+  const setSelectedConvId = (id: string | null) => {
+    if (id) {
+      setSearchParams({ room: id }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
   const [mobileShowChat, setMobileShowChat] = useState(false);
+
+  useEffect(() => {
+    if (selectedConvId) {
+      setMobileShowChat(true);
+    }
+  }, [selectedConvId]);
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showInfo, setShowInfo] = useState(false);
