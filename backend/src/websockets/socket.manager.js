@@ -144,7 +144,7 @@ const init = (server) => {
             pushService.sendPushToUsers(recipientIds, {
               title: `Tin nhan tu ${senderName}`,
               body,
-              icon: newMessage.users?.avatar || '/pwa-192x192.png',
+              icon: `${process.env.FRONTEND_URL || 'https://tlsunchat.vercel.app'}/pwa-192x192.png`,
               tag: `message-${newMessage.id}`,
               url: '/'
             }).catch(error => {
