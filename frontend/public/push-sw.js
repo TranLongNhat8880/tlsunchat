@@ -14,7 +14,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: payload.body || 'Ban co tin nhan moi',
     icon: payload.icon || '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
+    badge: payload.badge || '/pwa-badge.svg',
     tag: payload.tag || 'tlsunchat-message',
     renotify: true,
     data: {
