@@ -12,6 +12,9 @@ const debugLog = (...args) => {
   if (isDev) console.log(...args);
 };
 
+const getFrontendUrl = () => (process.env.FRONTEND_URL || 'https://tlsunchat.vercel.app').replace(/\/$/, '');
+const toPublicAssetUrl = (path) => `${getFrontendUrl()}${path.startsWith('/') ? path : `/${path}`}`;
+
 const getOnlineUserIds = () => Array.from(onlineUsers.keys());
 
 const markUserOnline = (userId) => {
@@ -133,6 +136,7 @@ const init = (server) => {
 
           if (recipientIds.length > 0) {
             const senderName = newMessage.users?.name || 'TLSunChat';
+            const senderAvatar = newMessage.users?.avatar || toPublicAssetUrl('/pwa-192x192.png');
             const body = type === 'file'
               ? 'Da gui mot tep tin'
               : type === 'image'
@@ -144,8 +148,9 @@ const init = (server) => {
             pushService.sendPushToUsers(recipientIds, {
               title: `Tin nhan tu ${senderName}`,
               body,
-              icon: newMessage.users?.avatar || '/pwa-192x192.png',
-              badge: `${process.env.FRONTEND_URL || 'https://tlsunchat.vercel.app'}/pwa-badge.svg`,
+              icon: senderAvatar,
+              image: senderAvatar,
+              badge: toPublicAssetUrl('/pwa-badge.svg'),
               tag: `message-${newMessage.id}`,
               url: '/'
             }).catch(error => {
