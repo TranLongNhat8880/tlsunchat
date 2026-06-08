@@ -100,11 +100,59 @@ const formatMessageFromApi = (m: any, status: Message['status'] = 'sent'): Messa
   };
 };
 
+interface RoomStoredState {
+  lastReadTime: number;
+  unreadCount: number;
+}
+
+const getStoredRoomStates = (userId: string): Record<string, RoomStoredState> => {
+  try {
+    const data = localStorage.getItem(`tlsunchat_room_states_${userId}`);
+    return data ? JSON.parse(data) : {};
+  } catch (e) {
+    return {};
+  }
+};
+
+const setStoredRoomState = (userId: string, roomId: string, lastReadTime: number, unreadCount: number) => {
+  try {
+    const states = getStoredRoomStates(userId);
+    states[roomId] = { lastReadTime, unreadCount };
+    localStorage.setItem(`tlsunchat_room_states_${userId}`, JSON.stringify(states));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 export function useChat(currentUser: User | null, selectedConvId: string | null) {
   const [users, setUsers] = useState<User[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const socketRef = useRef<Socket | null>(null);
+
+  const computeUnreadForRoom = (roomId: string, lastMsgObj: any, isSelected: boolean) => {
+    if (isSelected) return 0;
+    if (!lastMsgObj) return 0;
+    if (!currentUser?.id) return 0;
+
+    const lastMsgTime = new Date(lastMsgObj.created_at).getTime();
+    const states = getStoredRoomStates(currentUser.id);
+    const roomState = states[roomId];
+
+    if (roomState) {
+      if (lastMsgObj.sender_id === currentUser.id) {
+        setStoredRoomState(currentUser.id, roomId, lastMsgTime, 0);
+        return 0;
+      }
+      if (lastMsgTime > roomState.lastReadTime) {
+        return roomState.unreadCount > 0 ? roomState.unreadCount : 1;
+      }
+      return 0;
+    } else {
+      setStoredRoomState(currentUser.id, roomId, lastMsgTime, 0);
+      return 0;
+    }
+  };
 
   const selectedConvIdRef = useRef(selectedConvId);
   useEffect(() => {
@@ -230,7 +278,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
                 participants,
                 lastMessage: lastMsgText,
                 lastTime: isNewRoom ? newMsg.timestamp : '',
-                unread: isNewRoom && !isSelected && newMsg.senderId !== currentUser?.id ? 1 : 0,
+                unread: computeUnreadForRoom(room.id, r.last_message, isSelected),
                 isPinned: r.is_pinned || false
               };
             });
@@ -250,12 +298,23 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
               if (newMsg.senderId === currentUser?.id) lastMsgText = `Bạn: ${lastMsgText}`;
             }
 
+            const nextUnread = isSelected ? 0 : (isMine ? c.unread : c.unread + 1);
+            if (currentUser?.id) {
+              if (isSelected || isMine) {
+                setStoredRoomState(currentUser.id, c.id, Date.now(), 0);
+              } else {
+                const states = getStoredRoomStates(currentUser.id);
+                const lastRead = states[c.id]?.lastReadTime || Date.now();
+                setStoredRoomState(currentUser.id, c.id, lastRead, nextUnread);
+              }
+            }
+
             return {
               ...c,
               lastMessage: lastMsgText,
               lastTime: newMsg.timestamp,
               updatedAt: Date.now(),
-              unread: isSelected ? 0 : isMine ? c.unread : c.unread + 1
+              unread: nextUnread
             };
           }
           return c;
@@ -356,13 +415,13 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
             lastMessage: lastMsgText,
             lastTime: lastTimeText,
             updatedAt,
-            unread: 0,
+            unread: computeUnreadForRoom(room.id, r.last_message, room.id === selectedConvIdRef.current),
             isPinned: r.is_pinned || false
           };
         });
         setConversations(prev => formattedRooms.map(nr => {
           const old = prev.find(p => p.id === nr.id);
-          return { ...nr, unread: old ? old.unread : 0 };
+          return { ...nr, unread: old ? old.unread : nr.unread };
         }));
       }).catch(err => console.error('Failed to reload rooms after recall', err));
     });
@@ -400,13 +459,13 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
             lastMessage: lastMsgText,
             lastTime: lastTimeText,
             updatedAt,
-            unread: 0,
+            unread: computeUnreadForRoom(room.id, r.last_message, room.id === selectedConvIdRef.current),
             isPinned: r.is_pinned || false
           };
         });
         setConversations(prev => formattedRooms.map(nr => {
           const old = prev.find(p => p.id === nr.id);
-          return { ...nr, unread: old ? old.unread : 0 };
+          return { ...nr, unread: old ? old.unread : nr.unread };
         }));
       }).catch(err => console.error('Failed to reload rooms', err));
     });
@@ -455,7 +514,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
           lastMessage: lastMsgText,
           lastTime: lastTimeText,
           updatedAt,
-          unread: 0,
+          unread: computeUnreadForRoom(room.id, r.last_message, room.id === selectedConvIdRef.current),
           isPinned: r.is_pinned || false
         };
       });
@@ -498,6 +557,10 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
     // Reset unread count
     setConversations(prev => prev.map(c => c.id === selectedConvId ? { ...c, unread: 0 } : c));
+
+    if (currentUser?.id) {
+      setStoredRoomState(currentUser.id, selectedConvId, Date.now(), 0);
+    }
 
     // Nếu đã tải rồi thì không tải lại
     if (messages[selectedConvId]) return;

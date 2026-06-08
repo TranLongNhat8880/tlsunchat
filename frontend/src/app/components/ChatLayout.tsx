@@ -867,8 +867,30 @@ export function ChatLayout({
   onLogout,
   onOpenAdmin,
 }: Props) {
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
-  const [mobileShowChat, setMobileShowChat] = useState(false);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(`tlsunchat_selected_conv_${currentUser?.id}`) || null;
+    } catch {
+      return null;
+    }
+  });
+  const [mobileShowChat, setMobileShowChat] = useState(() => {
+    try {
+      return !!localStorage.getItem(`tlsunchat_selected_conv_${currentUser?.id}`);
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      if (selectedConvId) {
+        localStorage.setItem(`tlsunchat_selected_conv_${currentUser.id}`, selectedConvId);
+      } else {
+        localStorage.removeItem(`tlsunchat_selected_conv_${currentUser.id}`);
+      }
+    }
+  }, [selectedConvId, currentUser?.id]);
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showInfo, setShowInfo] = useState(false);
