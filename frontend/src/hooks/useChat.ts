@@ -100,6 +100,47 @@ const formatMessageFromApi = (m: any, status: Message['status'] = 'sent'): Messa
   };
 };
 
+const getStoredReadTimes = (userId: string): Record<string, number> => {
+  try {
+    const data = localStorage.getItem(`tlsunchat_room_read_times_${userId}`);
+    return data ? JSON.parse(data) : {};
+  } catch (e) {
+    return {};
+  }
+};
+
+const setStoredReadTime = (userId: string, roomId: string, readTime: number) => {
+  try {
+    const readTimes = getStoredReadTimes(userId);
+    readTimes[roomId] = readTime;
+    localStorage.setItem(`tlsunchat_room_read_times_${userId}`, JSON.stringify(readTimes));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const seedStoredReadTimes = (userId: string, rooms: any[]) => {
+  try {
+    const readTimes = getStoredReadTimes(userId);
+    let changed = false;
+
+    rooms.forEach((roomEntry: any) => {
+      const roomId = roomEntry.rooms?.id;
+      const lastMessage = roomEntry.last_message;
+      if (!roomId || !lastMessage || readTimes[roomId]) return;
+
+      readTimes[roomId] = new Date(lastMessage.created_at).getTime();
+      changed = true;
+    });
+
+    if (changed) {
+      localStorage.setItem(`tlsunchat_room_read_times_${userId}`, JSON.stringify(readTimes));
+    }
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 export function useChat(currentUser: User | null, selectedConvId: string | null) {
   const [users, setUsers] = useState<User[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -134,6 +175,16 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       updatedAt = msgDate.getTime();
     }
 
+    const unread = (() => {
+      if (!lastMsgObj || !currentUser?.id) return 0;
+      if (room.id === selectedId) return 0;
+      if (lastMsgObj.sender_id === currentUser.id) return 0;
+
+      const lastMsgTime = new Date(lastMsgObj.created_at).getTime();
+      const readTime = getStoredReadTimes(currentUser.id)[room.id];
+      return readTime && lastMsgTime > readTime ? 1 : 0;
+    })();
+
     return {
       id: room.id,
       type: room.type === 'direct' ? 'dm' : 'group',
@@ -142,7 +193,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       lastMessage: lastMsgText,
       lastTime: lastTimeText,
       updatedAt,
-      unread: 0,
+      unread,
       isPinned: r.is_pinned || false
     };
   };
@@ -281,6 +332,10 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
             const isPageActive = typeof document !== 'undefined' && document.hasFocus() && !document.hidden;
             const nextUnread = (isSelected && isPageActive) ? 0 : (isMine ? c.unread : c.unread + 1);
+            if (currentUser?.id && (isMine || (isSelected && isPageActive))) {
+              const readTime = newMsg.createdAt ? new Date(newMsg.createdAt).getTime() : Date.now();
+              setStoredReadTime(currentUser.id, c.id, readTime);
+            }
 
             return {
               ...c,
@@ -398,6 +453,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
     // Tải danh sách Rooms
     api.get('/chat/rooms').then(res => {
+      if (currentUser?.id) {
+        seedStoredReadTimes(currentUser.id, res.data.data.rooms);
+      }
       const formattedRooms = res.data.data.rooms.map((r: any) => 
         formatRoomFromApi(r, selectedConvIdRef.current)
       );
@@ -440,6 +498,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
     // Reset unread count
     setConversations(prev => prev.map(c => c.id === selectedConvId ? { ...c, unread: 0 } : c));
+    if (currentUser?.id) {
+      setStoredReadTime(currentUser.id, selectedConvId, Date.now());
+    }
 
     // Nếu đã tải rồi thì không tải lại
     if (messages[selectedConvId]) return;
@@ -494,6 +555,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     const handleFocus = () => {
       if (selectedConvId) {
         setConversations(prev => prev.map(c => c.id === selectedConvId ? { ...c, unread: 0 } : c));
+        if (currentUser?.id) {
+          setStoredReadTime(currentUser.id, selectedConvId, Date.now());
+        }
       }
     };
 
