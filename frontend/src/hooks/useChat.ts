@@ -100,61 +100,11 @@ const formatMessageFromApi = (m: any, status: Message['status'] = 'sent'): Messa
   };
 };
 
-interface RoomStoredState {
-  lastReadTime: number;
-  unreadCount: number;
-}
-
-const getStoredRoomStates = (userId: string): Record<string, RoomStoredState> => {
-  try {
-    const data = localStorage.getItem(`tlsunchat_room_states_${userId}`);
-    return data ? JSON.parse(data) : {};
-  } catch (e) {
-    return {};
-  }
-};
-
-const setStoredRoomState = (userId: string, roomId: string, lastReadTime: number, unreadCount: number) => {
-  try {
-    const states = getStoredRoomStates(userId);
-    states[roomId] = { lastReadTime, unreadCount };
-    localStorage.setItem(`tlsunchat_room_states_${userId}`, JSON.stringify(states));
-  } catch (e) {
-    console.error(e);
-  }
-};
-
 export function useChat(currentUser: User | null, selectedConvId: string | null) {
   const [users, setUsers] = useState<User[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const socketRef = useRef<Socket | null>(null);
-
-  const computeUnreadForRoom = (roomId: string, lastMsgObj: any, isSelected: boolean) => {
-    const isPageActive = typeof document !== 'undefined' && document.hasFocus() && !document.hidden;
-    const shouldBeRead = isSelected && isPageActive;
-    if (shouldBeRead) return 0;
-    if (!lastMsgObj) return 0;
-    if (!currentUser?.id) return 0;
-
-    const lastMsgTime = new Date(lastMsgObj.created_at).getTime();
-    const states = getStoredRoomStates(currentUser.id);
-    const roomState = states[roomId];
-
-    if (roomState) {
-      if (lastMsgObj.sender_id === currentUser.id) {
-        setStoredRoomState(currentUser.id, roomId, lastMsgTime, 0);
-        return 0;
-      }
-      if (lastMsgTime > roomState.lastReadTime) {
-        return roomState.unreadCount > 0 ? roomState.unreadCount : 1;
-      }
-      return 0;
-    } else {
-      setStoredRoomState(currentUser.id, roomId, lastMsgTime, 0);
-      return 0;
-    }
-  };
 
   const formatRoomFromApi = (r: any, selectedId: string | null): Conversation => {
     const room = r.rooms;
@@ -192,7 +142,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       lastMessage: lastMsgText,
       lastTime: lastTimeText,
       updatedAt,
-      unread: computeUnreadForRoom(room.id, lastMsgObj, room.id === selectedId),
+      unread: 0,
       isPinned: r.is_pinned || false
     };
   };
@@ -331,15 +281,6 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
             const isPageActive = typeof document !== 'undefined' && document.hasFocus() && !document.hidden;
             const nextUnread = (isSelected && isPageActive) ? 0 : (isMine ? c.unread : c.unread + 1);
-            if (currentUser?.id) {
-              if ((isSelected && isPageActive) || isMine) {
-                setStoredRoomState(currentUser.id, c.id, Date.now(), 0);
-              } else {
-                const states = getStoredRoomStates(currentUser.id);
-                const lastRead = states[c.id]?.lastReadTime || Date.now();
-                setStoredRoomState(currentUser.id, c.id, lastRead, nextUnread);
-              }
-            }
 
             return {
               ...c,
@@ -500,10 +441,6 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     // Reset unread count
     setConversations(prev => prev.map(c => c.id === selectedConvId ? { ...c, unread: 0 } : c));
 
-    if (currentUser?.id) {
-      setStoredRoomState(currentUser.id, selectedConvId, Date.now(), 0);
-    }
-
     // Nếu đã tải rồi thì không tải lại
     if (messages[selectedConvId]) return;
 
@@ -555,9 +492,8 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
   // Reset unread count of active room when window gains focus or page becomes visible
   useEffect(() => {
     const handleFocus = () => {
-      if (selectedConvId && currentUser?.id) {
+      if (selectedConvId) {
         setConversations(prev => prev.map(c => c.id === selectedConvId ? { ...c, unread: 0 } : c));
-        setStoredRoomState(currentUser.id, selectedConvId, Date.now(), 0);
       }
     };
 
