@@ -906,6 +906,7 @@ export function ChatLayout({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const pendingAttachmentsRef = useRef<PendingAttachment[]>([]);
+  const lastScrolledRoomRef = useRef<string | null>(null);
   const imageTouchStartRef = useRef<{ x: number; y: number } | null>(null);
   const imageTouchMovedRef = useRef(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -1278,7 +1279,21 @@ export function ChatLayout({
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!selectedConvId) return;
+
+    if (convMessages.length > 0) {
+      const isNewRoom = lastScrolledRoomRef.current !== selectedConvId;
+      const scrollBehavior = isNewRoom ? 'auto' : 'smooth';
+      
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: scrollBehavior });
+        if (isNewRoom) {
+          lastScrolledRoomRef.current = selectedConvId;
+        }
+      }, 50);
+
+      return () => clearTimeout(timer);
+    }
   }, [convMessages.length, selectedConvId]);
 
   useEffect(() => {
