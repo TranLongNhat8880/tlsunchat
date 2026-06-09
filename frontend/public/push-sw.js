@@ -45,7 +45,15 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const targetUrl = new URL(event.notification.data?.url || '/', self.location.origin);
+  const roomId = targetUrl.searchParams.get('room');
+  const messageId = targetUrl.searchParams.get('message');
+  const openMessage = {
+    type: 'TLSUNCHAT_OPEN_NOTIFICATION',
+    roomId,
+    messageId,
+    url: targetUrl.pathname + targetUrl.search
+  };
 
   event.waitUntil((async () => {
     const windows = await clients.matchAll({
@@ -55,14 +63,15 @@ self.addEventListener('notificationclick', (event) => {
 
     for (const client of windows) {
       if ('focus' in client) {
+        client.postMessage(openMessage);
         await client.focus();
-        if ('navigate' in client) await client.navigate(url);
+        if ('navigate' in client) await client.navigate(targetUrl.href);
         return;
       }
     }
 
     if (clients.openWindow) {
-      await clients.openWindow(url);
+      await clients.openWindow(targetUrl.href);
     }
   })());
 });

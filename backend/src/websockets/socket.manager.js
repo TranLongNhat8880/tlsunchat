@@ -151,7 +151,7 @@ const init = (server) => {
               icon: senderAvatar,
               badge: toPublicAssetUrl('/pwa-badge.svg'),
               tag: `message-${newMessage.id}`,
-              url: `/?room=${roomId}`
+              url: `/?room=${encodeURIComponent(roomId)}&message=${encodeURIComponent(newMessage.id)}`
             }).catch(error => {
               console.error('Failed to queue push notification:', error.message);
             });

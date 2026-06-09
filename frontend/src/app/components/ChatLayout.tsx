@@ -870,9 +870,12 @@ export function ChatLayout({
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedConvId = searchParams.get('room');
-  const setSelectedConvId = (id: string | null) => {
+  const selectedMessageId = searchParams.get('message');
+  const setSelectedConvId = (id: string | null, messageId?: string | null) => {
     if (id) {
-      setSearchParams({ room: id }, { replace: true });
+      const nextParams: Record<string, string> = { room: id };
+      if (messageId) nextParams.message = messageId;
+      setSearchParams(nextParams, { replace: true });
     } else {
       setSearchParams({}, { replace: true });
     }
@@ -885,6 +888,7 @@ export function ChatLayout({
       setMobileShowChat(true);
     }
   }, [selectedConvId]);
+
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showInfo, setShowInfo] = useState(false);
@@ -1090,6 +1094,25 @@ export function ChatLayout({
 
   const closeImageViewer = () => setImageViewer(null);
 
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'TLSUNCHAT_OPEN_NOTIFICATION') return;
+      if (!event.data.roomId) return;
+
+      clearPendingAttachments();
+      closeImageViewer();
+      setShowInfo(false);
+      setReplyTo(null);
+      setSelectedConvId(event.data.roomId, event.data.messageId);
+      setMobileShowChat(true);
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+  }, []);
+
   const getPartner = (conv: Conversation) =>
     users.find(u => u.id !== currentUser.id && conv.participants.includes(u.id));
 
@@ -1159,6 +1182,12 @@ export function ChatLayout({
     setHighlightedMessageId(messageId);
     window.setTimeout(() => setHighlightedMessageId(null), 1600);
   };
+
+  useEffect(() => {
+    if (!selectedMessageId || convMessages.length === 0) return;
+    const timer = window.setTimeout(() => scrollToMessage(selectedMessageId), 150);
+    return () => window.clearTimeout(timer);
+  }, [selectedMessageId, convMessages.length]);
 
   const handlePinMessage = async (message: Message) => {
     if (!message.isPinned && pinnedMessages.length >= 3) {
