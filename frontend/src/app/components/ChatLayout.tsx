@@ -1424,7 +1424,7 @@ export function ChatLayout({
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Tìm kiếm hội thoại..."
             className="w-full pl-9 pr-3 py-2 bg-white rounded-xl border border-green-100 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all"
-            style={{ fontSize: '0.85rem' }}
+            style={{ fontSize: '16px' }}
           />
         </div>
       </div>
@@ -1911,7 +1911,7 @@ export function ChatLayout({
               placeholder={isUploading ? "Đang tải file lên..." : "Nhập tin nhắn..."}
               disabled={isUploading}
               className="flex-1 bg-gray-100 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400 focus:bg-white transition-all disabled:opacity-50"
-              style={{ fontSize: '0.9rem' }}
+              style={{ fontSize: '16px' }}
             />
             <button
               onClick={handleSendComposer}

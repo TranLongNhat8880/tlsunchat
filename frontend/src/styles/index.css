@@ -2,10 +2,23 @@
 @import './tailwind.css';
 @import './theme.css';
 
-/* Ngăn iOS tự động zoom khi focus vào ô nhập liệu trên thiết bị di động */
-@media (max-width: 768px) {
-  input, select, textarea {
-    font-size: 16px !important;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
+/* Keep iOS Safari/PWA from auto-zooming focused form controls below 16px. */
+@media (max-width: 768px) {
+  input,
+  input[type='email'],
+  input[type='password'],
+  input[type='search'],
+  input[type='tel'],
+  input[type='text'],
+  input[type='url'],
+  select,
+  textarea {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+  }
+}
