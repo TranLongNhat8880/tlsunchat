@@ -1173,6 +1173,8 @@ export function ChatLayout({
               onClose={() => setShowInfo(false)}
               messages={convMessages}
               users={users}
+              onOpenImage={openImageViewer}
+              onLinkClick={setPendingExternalLink}
             />
           </div>
         )}

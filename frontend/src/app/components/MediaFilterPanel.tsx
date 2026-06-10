@@ -11,6 +11,8 @@ interface MediaFilterPanelProps {
   onClose: () => void;
   messages: Message[];
   users: User[];
+  onOpenImage: (message: Message, group?: Message[]) => void;
+  onLinkClick: (url: string) => void;
 }
 
 export function MediaFilterPanel({
@@ -19,12 +21,15 @@ export function MediaFilterPanel({
   onClose,
   messages,
   users,
+  onOpenImage,
+  onLinkClick,
 }: MediaFilterPanelProps) {
   const tabs: { key: MediaTab; label: string; icon: React.ReactNode }[] = [
     { key: 'images', label: 'Hình ảnh', icon: <ImageIcon className="w-4 h-4" /> },
     { key: 'files', label: 'Tệp tin', icon: <FileText className="w-4 h-4" /> },
     { key: 'links', label: 'Liên kết', icon: <LinkIcon className="w-4 h-4" /> },
   ];
+  const imageMessages = messages.filter(m => m.type === 'image' && m.fileUrl);
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -63,10 +68,11 @@ export function MediaFilterPanel({
       <div className="flex-1 overflow-y-auto p-3">
         {tab === 'images' && (
           <div className="grid grid-cols-3 gap-1.5">
-            {messages.filter(m => m.type === 'image' && m.fileUrl).map(img => (
-              <div
+            {imageMessages.map(img => (
+              <button
+                type="button"
                 key={img.id}
-                onClick={() => window.open(img.fileUrl, '_blank')}
+                onClick={() => onOpenImage(img, imageMessages)}
                 className="aspect-square rounded-xl bg-gradient-to-br from-green-100 to-emerald-200 flex flex-col items-center justify-center gap-1 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden relative group"
               >
                 <img src={img.fileUrl} className="w-full h-full object-cover" />
@@ -75,7 +81,7 @@ export function MediaFilterPanel({
                     {img.fileName || 'Hình ảnh'}
                   </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -135,10 +141,11 @@ export function MediaFilterPanel({
             {messages.filter(m => m.type === 'text' && m.content.match(/https?:\/\/[^\s]+/g)).map(link => {
               const urls = link.content.match(/https?:\/\/[^\s]+/g) || [];
               return urls.map((url, i) => (
-                <div
+                <button
+                  type="button"
                   key={`${link.id}-${i}`}
-                  onClick={() => window.open(url, '_blank')}
-                  className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-green-50 transition-colors cursor-pointer"
+                  onClick={() => onLinkClick(url)}
+                  className="w-full text-left flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-green-50 transition-colors cursor-pointer"
                 >
                   <div className="bg-blue-50 p-2 rounded-lg flex-shrink-0">
                     <LinkIcon className="w-4 h-4 text-blue-500" />
@@ -154,7 +161,7 @@ export function MediaFilterPanel({
                       {link.timestamp}
                     </p>
                   </div>
-                </div>
+                </button>
               ));
             })}
           </div>
