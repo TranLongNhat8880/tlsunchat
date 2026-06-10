@@ -65,7 +65,6 @@ self.addEventListener('notificationclick', (event) => {
       if ('focus' in client) {
         client.postMessage(openMessage);
         await client.focus();
-        if ('navigate' in client) await client.navigate(targetUrl.href);
         return;
       }
     }

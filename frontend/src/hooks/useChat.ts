@@ -58,6 +58,41 @@ const uploadWithProgress = (
 
 const notificationAudio = new Audio('/notnew.mp3');
 
+const showForegroundNotification = (options: {
+  title: string;
+  body: string;
+  icon?: string;
+  url: string;
+}) => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const notificationOptions: NotificationOptions = {
+    body: options.body,
+    icon: options.icon || '/pwa-192x192.png',
+    badge: '/pwa-badge.svg',
+    tag: 'tlsunchat-message',
+    renotify: true,
+    data: { url: options.url }
+  };
+
+  try {
+    const notification = new Notification(options.title, notificationOptions);
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+    return;
+  } catch (error) {
+    console.warn('Notification constructor failed, falling back to service worker:', error);
+  }
+
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker.ready
+    .then(registration => registration.showNotification(options.title, notificationOptions))
+    .catch(error => console.warn('Failed to show foreground notification:', error));
+};
+
 const formatReactions = (reactions?: Record<string, string> | null): Message['reactions'] => {
   if (!reactions || typeof reactions !== 'object') return undefined;
 
@@ -282,14 +317,12 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
             const senderName = sender?.name || 'Ai đó';
             const body = newMsg.type === 'file' ? '📎 Gửi một tệp tin' : newMsg.type === 'image' ? '🖼️ Gửi một hình ảnh' : newMsg.content;
             
-            const notification = new Notification(`Tin nhắn từ ${senderName}`, {
+            showForegroundNotification({
+              title: `Tin nhắn từ ${senderName}`,
               body,
-              icon: '/pwa-192x192.png',
+              icon: sender?.avatar || '/pwa-192x192.png',
+              url: `/?room=${encodeURIComponent(newMsg.conversationId)}&message=${encodeURIComponent(newMsg.id)}`
             });
-            notification.onclick = () => {
-              window.focus();
-              notification.close();
-            };
           }
         }
 

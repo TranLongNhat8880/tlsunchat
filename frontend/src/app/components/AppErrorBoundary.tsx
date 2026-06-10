@@ -41,10 +41,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
       at: new Date().toISOString()
     }));
 
-    if (sessionStorage.getItem(RECOVERY_KEY) !== '1') {
-      sessionStorage.setItem(RECOVERY_KEY, '1');
-      window.location.reload();
-    }
+    sessionStorage.setItem(RECOVERY_KEY, '1');
   }
 
   render() {
