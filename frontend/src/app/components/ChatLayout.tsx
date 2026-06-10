@@ -1102,7 +1102,7 @@ export function ChatLayout({
                   key={`pin-${pinned.id}`}
                   onClick={() => scrollToMessage(pinned.id)}
                   className="flex items-center justify-between text-sm rounded-xl border border-green-100 bg-green-50 px-2.5 py-2 cursor-pointer hover:bg-green-100 hover:border-green-300 transition-colors"
-                  title="Di toi tin ghim"
+                  title="Đi tới tin nhắn ghim"
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
                     <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
@@ -1431,7 +1431,7 @@ export function ChatLayout({
               closeImageViewer();
             }}
             className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-            title="Dong"
+            title="Đóng"
           >
             <X className="w-5 h-5" />
           </button>
@@ -1444,7 +1444,7 @@ export function ChatLayout({
                   showRelativeImage(-1);
                 }}
                 className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/12 text-white hover:bg-white/25 active:bg-white/30 transition-colors"
-                title="Anh truoc"
+                title="Ảnh trước"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
@@ -1454,7 +1454,7 @@ export function ChatLayout({
                   showRelativeImage(1);
                 }}
                 className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/12 text-white hover:bg-white/25 active:bg-white/30 transition-colors"
-                title="Anh tiep theo"
+                title="Ảnh tiếp theo"
               >
                 <ChevronRight className="w-6 h-6" />
               </button>
