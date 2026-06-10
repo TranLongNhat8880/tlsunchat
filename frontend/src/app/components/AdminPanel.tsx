@@ -197,6 +197,8 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [resetUserId, setResetUserId] = useState<string | null>(null);
   const [statusLoadingUserId, setStatusLoadingUserId] = useState<string | null>(null);
+  const [confirmStatusUser, setConfirmStatusUser] = useState<User | null>(null);
+  const [toastNotification, setToastNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Users state
@@ -261,14 +263,18 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
   const usedMB = usedBytes / (1024 * 1024);
   const usagePercent = Math.min(100, Math.round((usedMB / TOTAL_CAPACITY_MB) * 100));
 
-  const handleToggleUserStatus = async (user: User) => {
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastNotification({ message, type });
+    window.setTimeout(() => setToastNotification(null), 4000);
+  };
+
+  const handleToggleUserStatusClick = (user: User) => {
+    setConfirmStatusUser(user);
+  };
+
+  const executeToggleUserStatus = async (user: User) => {
     const nextIsActive = !user.isActive;
-    const actionLabel = nextIsActive ? 'mở khóa' : 'khóa';
-
-    if (!window.confirm(`Bạn có chắc muốn ${actionLabel} tài khoản ${user.name}?`)) {
-      return;
-    }
-
+    setConfirmStatusUser(null);
     setStatusLoadingUserId(user.id);
     try {
       await api.put(`/users/admin/${user.id}/status`, { is_active: nextIsActive });
@@ -281,9 +287,14 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
             }
           : item
       )));
-      alert(nextIsActive ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản và đá phiên đăng nhập');
+      showToast(
+        nextIsActive
+          ? `Đã mở khóa tài khoản ${user.name} thành công.`
+          : `Đã khóa tài khoản ${user.name} và hủy toàn bộ phiên làm việc của người dùng.`,
+        'success'
+      );
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Có lỗi xảy ra');
+      showToast(error.response?.data?.message || 'Không thể thực hiện hành động này. Vui lòng thử lại.', 'error');
     } finally {
       setStatusLoadingUserId(null);
     }
@@ -437,7 +448,7 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
                   {user.id !== currentUser.id && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button
-                        onClick={() => handleToggleUserStatus(user)}
+                        onClick={() => handleToggleUserStatusClick(user)}
                         disabled={statusLoadingUserId === user.id}
                         className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
                           user.isActive === false
@@ -680,6 +691,83 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
             setRefreshTrigger(prev => prev + 1);
           }} 
         />
+      )}
+
+      {/* Custom Toast Notification */}
+      {toastNotification && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div className={`rounded-2xl px-4 py-3 shadow-xl flex items-center gap-3 border ${
+            toastNotification.type === 'success'
+              ? 'bg-green-50 border-green-100 text-green-700'
+              : 'bg-red-50 border-red-100 text-red-700'
+          }`}>
+            {toastNotification.type === 'success' ? (
+              <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            )}
+            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{toastNotification.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm User Status Toggle Modal */}
+      {confirmStatusUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm border border-gray-100 shadow-2xl relative overflow-hidden transform scale-100 transition-all duration-300 ease-out animate-slide-up">
+            <div className="absolute -top-12 -left-12 w-36 h-36 bg-gray-50 rounded-full blur-2xl opacity-60 pointer-events-none" />
+
+            <div className="flex justify-between items-start relative z-10">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ${
+                confirmStatusUser.isActive === false
+                  ? 'bg-green-50 text-green-600'
+                  : 'bg-yellow-50 text-yellow-600'
+              }`}>
+                {confirmStatusUser.isActive === false ? (
+                  <Unlock className="w-6 h-6 animate-bounce" />
+                ) : (
+                  <Lock className="w-6 h-6" />
+                )}
+              </div>
+              <button
+                onClick={() => setConfirmStatusUser(null)}
+                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 relative z-10">
+              <h3 className="text-gray-900 font-extrabold text-xl leading-tight">
+                {confirmStatusUser.isActive === false ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+              </h3>
+              <p className="text-gray-500 text-sm mt-3 leading-relaxed">
+                {confirmStatusUser.isActive === false
+                  ? `Bạn có chắc chắn muốn mở khóa tài khoản của ${confirmStatusUser.name}? Người dùng này sẽ có thể đăng nhập lại bình thường.`
+                  : `Bạn có chắc chắn muốn khóa tài khoản của ${confirmStatusUser.name}? Phiên làm việc trên tất cả thiết bị của người dùng này sẽ bị hủy ngay lập tức.`}
+              </p>
+            </div>
+
+            <div className="mt-6 flex gap-3 relative z-10">
+              <button
+                onClick={() => setConfirmStatusUser(null)}
+                className="flex-1 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-600 font-semibold transition-all text-center text-sm"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => executeToggleUserStatus(confirmStatusUser)}
+                className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-md transition-all text-center text-sm ${
+                  confirmStatusUser.isActive === false
+                    ? 'bg-green-500 hover:bg-green-600 shadow-green-200'
+                    : 'bg-yellow-500 hover:bg-yellow-600 shadow-yellow-200'
+                }`}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
