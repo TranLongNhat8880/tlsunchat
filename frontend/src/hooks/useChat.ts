@@ -913,10 +913,27 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
   };
 
   const pinMessage = async (messageId: string, isPinned: boolean) => {
+    let previousMessages: Record<string, Message[]> | null = null;
+
+    setMessages(prev => {
+      previousMessages = prev;
+      const next: Record<string, Message[]> = {};
+      for (const roomId in prev) {
+        next[roomId] = prev[roomId].map(message => (
+          message.id === messageId ? { ...message, isPinned } : message
+        ));
+      }
+      return next;
+    });
+
     try {
       await api.put(`/chat/messages/${messageId}/pin`, { isPinned });
     } catch (err) {
       console.error('Lỗi khi ghim tin nhắn', err);
+      if (previousMessages) {
+        setMessages(previousMessages);
+      }
+      throw err;
     }
   };
 

@@ -463,7 +463,11 @@ export function ChatLayout({
       return;
     }
 
-    await pinMessage(message.id, !message.isPinned);
+    try {
+      await pinMessage(message.id, !message.isPinned);
+    } catch (error) {
+      alert('Không thể cập nhật ghim tin nhắn. Vui lòng thử lại.');
+    }
   };
 
   const handleRecallMessage = async (message: Message, group?: Message[]) => {
@@ -579,6 +583,7 @@ export function ChatLayout({
     setInputText('');
     setReplyTo(null);
     clearPendingAttachments();
+    window.setTimeout(() => inputRef.current?.focus(), 0);
     setIsUploading(true);
 
     try {
@@ -594,6 +599,7 @@ export function ChatLayout({
       alert(error.message || 'Có lỗi xảy ra khi gửi file');
     } finally {
       setIsUploading(false);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
 
@@ -1108,7 +1114,9 @@ export function ChatLayout({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      pinMessage(pinned.id, false);
+                      pinMessage(pinned.id, false).catch(() => {
+                        alert('Không thể bỏ ghim tin nhắn. Vui lòng thử lại.');
+                      });
                     }}
                     className="text-gray-400 hover:text-green-600 flex-shrink-0 ml-2"
                   >
