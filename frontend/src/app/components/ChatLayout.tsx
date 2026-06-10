@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   MessageCircle, Search, LogOut, ChevronLeft, Send, Paperclip, Smile,
   MoreVertical, Download, X, Shield, ImageIcon, Info,
-  Bell, Settings, Video, Plus, ChevronRight, AlertTriangle, FileText, Eraser, Trash2, UserMinus
+  Bell, Settings, Video, Plus, ChevronRight, AlertTriangle, FileText, UserMinus
 } from 'lucide-react';
 import type { User, Conversation, Message } from '../App';
 import { CreateGroupModal } from './CreateGroupModal';
@@ -78,6 +78,9 @@ export function ChatLayout({
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showRoomMenu, setShowRoomMenu] = useState(false);
+  const [showConversationSearch, setShowConversationSearch] = useState(false);
+  const [conversationSearchQuery, setConversationSearchQuery] = useState('');
+  const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -90,6 +93,7 @@ export function ChatLayout({
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const roomMenuRef = useRef<HTMLDivElement>(null);
+  const conversationSearchInputRef = useRef<HTMLInputElement>(null);
   const [recallConfirm, setRecallConfirm] = useState<{ messages: Message[], label: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -115,7 +119,7 @@ export function ChatLayout({
     pinMessage,
     reactToMessage,
     recallMessage,
-    clearRoomHistory,
+    markRoomUnread,
     leaveRoom
   } = useChat(currentUser, selectedConvId);
 
@@ -249,6 +253,19 @@ export function ChatLayout({
   const selectedConv = conversations.find(c => c.id === selectedConvId);
   const convMessages = selectedConvId ? (messages[selectedConvId] ?? []) : [];
   const pinnedMessages = convMessages.filter(m => m.isPinned).slice(0, 3);
+  const normalizedConversationSearch = conversationSearchQuery.trim().toLowerCase();
+  const conversationSearchMatches = normalizedConversationSearch
+    ? convMessages.filter(message => {
+      if (message.content === '__MESSAGE_RECALLED__') return false;
+      const searchableText = [
+        message.content,
+        message.fileName,
+        message.replyTo?.content
+      ].filter(Boolean).join(' ').toLowerCase();
+      return searchableText.includes(normalizedConversationSearch);
+    })
+    : [];
+  const activeSearchMatch = conversationSearchMatches[activeSearchMatchIndex] ?? null;
   const activeImage = imageViewer ? imageViewer.images[imageViewer.index] : null;
   const imageViewerCount = imageViewer?.images.length ?? 0;
   const canNavigateImages = imageViewerCount > 1;
@@ -334,6 +351,8 @@ export function ChatLayout({
     setMobileShowChat(true);
     setShowInfo(false);
     setReplyTo(null);
+    setShowConversationSearch(false);
+    setConversationSearchQuery('');
   };
 
   const startDirectChat = async (userId: string) => {
@@ -341,6 +360,8 @@ export function ChatLayout({
     closeImageViewer();
     setShowInfo(false);
     setReplyTo(null);
+    setShowConversationSearch(false);
+    setConversationSearchQuery('');
 
     const roomId = await createRoom(userId);
     if (roomId) {
@@ -349,24 +370,24 @@ export function ChatLayout({
     }
   };
 
-  const handleClearRoomHistory = () => {
+  const handleMarkRoomUnread = () => {
     if (!selectedConv) return;
-    const ok = window.confirm('Xóa lịch sử hiển thị của cuộc trò chuyện này trên thiết bị của bạn?');
-    if (!ok) return;
-
-    clearPendingAttachments();
-    closeImageViewer();
-    setReplyTo(null);
-    clearRoomHistory(selectedConv.id);
+    markRoomUnread(selectedConv.id);
     setShowRoomMenu(false);
   };
 
-  const handleLeaveOrDeleteRoom = async () => {
+  const handleOpenConversationSearch = () => {
     if (!selectedConv) return;
+    setShowConversationSearch(true);
+    setShowRoomMenu(false);
+    setShowInfo(false);
+    window.setTimeout(() => conversationSearchInputRef.current?.focus(), 0);
+  };
 
-    const isGroup = selectedConv.type === 'group';
-    const label = isGroup ? 'rời khỏi nhóm này' : 'xóa cuộc trò chuyện này khỏi sidebar của bạn';
-    const ok = window.confirm(`Bạn chắc chắn muốn ${label}?`);
+  const handleLeaveGroup = async () => {
+    if (!selectedConv || selectedConv.type !== 'group') return;
+
+    const ok = window.confirm('Bạn chắc chắn muốn rời khỏi nhóm này?');
     if (!ok) return;
 
     try {
@@ -379,8 +400,8 @@ export function ChatLayout({
       setMobileShowChat(false);
       setShowRoomMenu(false);
     } catch (error) {
-      console.error('Không thể cập nhật cuộc trò chuyện:', error);
-      alert('Không thể cập nhật cuộc trò chuyện. Vui lòng thử lại.');
+      console.error('Không thể rời nhóm:', error);
+      alert('Không thể rời nhóm. Vui lòng thử lại.');
     }
   };
 
@@ -412,6 +433,29 @@ export function ChatLayout({
     const timer = window.setTimeout(() => scrollToMessage(selectedMessageId), 150);
     return () => window.clearTimeout(timer);
   }, [selectedMessageId, convMessages.length]);
+
+  useEffect(() => {
+    setActiveSearchMatchIndex(0);
+  }, [conversationSearchQuery, selectedConvId]);
+
+  useEffect(() => {
+    if (activeSearchMatchIndex >= conversationSearchMatches.length) {
+      setActiveSearchMatchIndex(0);
+    }
+  }, [activeSearchMatchIndex, conversationSearchMatches.length]);
+
+  useEffect(() => {
+    if (showConversationSearch) {
+      window.setTimeout(() => conversationSearchInputRef.current?.focus(), 0);
+    }
+  }, [showConversationSearch]);
+
+  const goToConversationSearchMatch = (offset: number) => {
+    if (conversationSearchMatches.length === 0) return;
+    const nextIndex = (activeSearchMatchIndex + offset + conversationSearchMatches.length) % conversationSearchMatches.length;
+    setActiveSearchMatchIndex(nextIndex);
+    scrollToMessage(conversationSearchMatches[nextIndex].id);
+  };
 
   const handlePinMessage = async (message: Message) => {
     if (!message.isPinned && pinnedMessages.length >= 3) {
@@ -933,31 +977,98 @@ export function ChatLayout({
               <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl shadow-gray-200/60 py-1.5 z-50 overflow-hidden">
                 <button
                   type="button"
-                  onClick={handleClearRoomHistory}
+                  onClick={handleMarkRoomUnread}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors"
                   style={{ fontSize: '0.82rem', fontWeight: 500 }}
                 >
-                  <Eraser className="w-4 h-4 text-gray-400" />
-                  <span>Xóa lịch sử hiển thị</span>
+                  <Bell className="w-4 h-4 text-gray-400" />
+                  <span>Đánh dấu chưa đọc</span>
                 </button>
                 <button
                   type="button"
-                  onClick={handleLeaveOrDeleteRoom}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors"
-                  style={{ fontSize: '0.82rem', fontWeight: 600 }}
+                  onClick={handleOpenConversationSearch}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors"
+                  style={{ fontSize: '0.82rem', fontWeight: 500 }}
                 >
-                  {selectedConv.type === 'group' ? (
-                    <UserMinus className="w-4 h-4 text-red-500" />
-                  ) : (
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  )}
-                  <span>{selectedConv.type === 'group' ? 'Rời khỏi nhóm' : 'Xóa cuộc trò chuyện'}</span>
+                  <Search className="w-4 h-4 text-gray-400" />
+                  <span>Tìm trong cuộc trò chuyện</span>
                 </button>
+                {selectedConv.type === 'group' && (
+                  <button
+                    type="button"
+                    onClick={handleLeaveGroup}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors"
+                    style={{ fontSize: '0.82rem', fontWeight: 600 }}
+                  >
+                    <UserMinus className="w-4 h-4 text-red-500" />
+                    <span>Rời khỏi nhóm</span>
+                  </button>
+                  )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {showConversationSearch && (
+        <div className="px-4 py-2 border-t border-gray-100 bg-white">
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+            <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <input
+              ref={conversationSearchInputRef}
+              value={conversationSearchQuery}
+              onChange={event => setConversationSearchQuery(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  goToConversationSearchMatch(event.shiftKey ? -1 : 1);
+                }
+                if (event.key === 'Escape') {
+                  setShowConversationSearch(false);
+                  setConversationSearchQuery('');
+                }
+              }}
+              placeholder="Tìm trong cuộc trò chuyện..."
+              className="flex-1 min-w-0 bg-transparent outline-none text-gray-700 placeholder:text-gray-400"
+              style={{ fontSize: '0.86rem' }}
+            />
+            {conversationSearchQuery && (
+              <span className="text-gray-400 tabular-nums flex-shrink-0" style={{ fontSize: '0.72rem' }}>
+                {conversationSearchMatches.length > 0 ? `${activeSearchMatchIndex + 1}/${conversationSearchMatches.length}` : '0'}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => goToConversationSearchMatch(-1)}
+              disabled={conversationSearchMatches.length === 0}
+              className="p-1.5 rounded-full text-gray-400 hover:bg-white hover:text-gray-700 disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition-colors"
+              title="Kết quả trước"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => goToConversationSearchMatch(1)}
+              disabled={conversationSearchMatches.length === 0}
+              className="p-1.5 rounded-full text-gray-400 hover:bg-white hover:text-gray-700 disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition-colors"
+              title="Kết quả tiếp theo"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowConversationSearch(false);
+                setConversationSearchQuery('');
+              }}
+              className="p-1.5 rounded-full text-gray-400 hover:bg-white hover:text-gray-700 transition-colors"
+              title="Đóng tìm kiếm"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Body: messages + optional info panel */}
       <div className="flex flex-1 min-h-0">
@@ -1053,12 +1164,15 @@ export function ChatLayout({
               const prevMsg = idx > 0 ? convMessages[idx - 1] : null;
               const showDateSep =
                 idx > 0 && prevMsg && msg.senderId !== prevMsg.senderId && idx === 4;
+              const isActiveSearchMatch = activeSearchMatch?.id === msg.id;
 
               return (
                 <div
                   key={msg.id}
                   ref={(el) => { messageRefs.current[msg.id] = el; }}
-                  className={`rounded-2xl transition-colors duration-500 ${highlightedMessageId === msg.id ? 'bg-yellow-100/80' : ''}`}
+                  className={`rounded-2xl transition-colors duration-500 ${
+                    highlightedMessageId === msg.id || isActiveSearchMatch ? 'bg-yellow-100/80' : ''
+                  }`}
                 >
                   {showDateSep && (
                     <div className="flex items-center gap-2 my-2">
