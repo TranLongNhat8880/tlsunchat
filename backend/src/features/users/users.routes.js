@@ -9,6 +9,7 @@ router.use(protect); // Bắt buộc đăng nhập
 router.get('/admin', restrictTo('admin'), usersController.getAdminUsers);
 router.delete('/admin/:id', restrictTo('admin'), usersController.deleteUser);
 router.put('/admin/:id/reset-password', restrictTo('admin'), usersController.resetPassword);
+router.put('/admin/:id/status', restrictTo('admin'), usersController.updateUserStatus);
 
 router.get('/', usersController.getAllUsers);
 

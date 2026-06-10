@@ -1,5 +1,6 @@
 const usersService = require('./users.service');
 const catchAsync = require('../../core/utils/catchAsync');
+const AppError = require('../../core/errors/AppError');
 
 // Lấy danh sách toàn bộ nhân viên công ty (trừ bản thân)
 exports.getAllUsers = catchAsync(async (req, res, next) => {
@@ -57,6 +58,37 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: 'success',
     message: 'Đã reset mật khẩu về mặc định (123456)'
+  });
+});
+
+exports.updateUserStatus = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { is_active: isActive } = req.body;
+
+  if (id === req.user.id) {
+    return next(new AppError('Khong the tu khoa hoac mo khoa tai khoan cua chinh minh', 400));
+  }
+
+  if (typeof isActive !== 'boolean') {
+    return next(new AppError('Vui long cung cap is_active dang boolean', 400));
+  }
+
+  const updatedUser = await require('./users.model').updateUserStatus(id, isActive);
+
+  if (!isActive) {
+    await require('../auth/auth.service').logoutAllSessions(id);
+    require('../../websockets/socket.manager').disconnectUser(id, 'ACCOUNT_LOCKED');
+  }
+
+  require('../../websockets/socket.manager').getIo().emit('user_updated', {
+    userId: id,
+    is_active: isActive
+  });
+
+  res.status(200).json({
+    status: 'success',
+    message: isActive ? 'Da mo khoa tai khoan' : 'Da khoa tai khoan',
+    data: { user: updatedUser }
   });
 });
 

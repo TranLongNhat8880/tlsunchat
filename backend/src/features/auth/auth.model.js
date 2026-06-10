@@ -101,3 +101,16 @@ exports.revokeSession = async (sessionId, userId) => {
     throw error;
   }
 };
+
+exports.revokeAllSessionsForUser = async (userId) => {
+  const { error } = await supabase
+    .from('auth_sessions')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('revoked_at', null);
+
+  if (error) {
+    if (isMissingSessionTableError(error)) return;
+    throw error;
+  }
+};

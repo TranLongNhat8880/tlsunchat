@@ -79,6 +79,10 @@ exports.logout = async (userId, sessionId) => {
   await authModel.revokeSession(sessionId, userId);
 };
 
+exports.logoutAllSessions = async (userId) => {
+  await authModel.revokeAllSessionsForUser(userId);
+};
+
 exports.createUser = async (userData) => {
   try {
     const password_hash = await bcrypt.hash(userData.password || DEFAULT_PASSWORD, 12);

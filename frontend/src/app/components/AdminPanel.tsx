@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { User } from '../App';
 import {
   ChevronLeft, Shield, Users, HardDrive, Plus, Trash2, Key,
-  Lock, Search, MoreVertical, X, Check, AlertTriangle, TrendingUp,
+  Lock, Unlock, Search, MoreVertical, X, Check, AlertTriangle, TrendingUp,
   UserPlus, Edit3, ChevronRight, ChevronLeft as ChevronLeftIcon
 } from 'lucide-react';
 import api from '../../lib/api';
@@ -196,6 +196,7 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [statusLoadingUserId, setStatusLoadingUserId] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Users state
@@ -224,6 +225,7 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
           email: u.email,
           avatar: u.avatar,
           status: u.is_active ? 'online' : 'offline',
+          isActive: u.is_active,
           role: u.role,
           color: 'bg-green-500',
           initials: (u.name || '').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
@@ -258,6 +260,34 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
 
   const usedMB = usedBytes / (1024 * 1024);
   const usagePercent = Math.min(100, Math.round((usedMB / TOTAL_CAPACITY_MB) * 100));
+
+  const handleToggleUserStatus = async (user: User) => {
+    const nextIsActive = !user.isActive;
+    const actionLabel = nextIsActive ? 'mở khóa' : 'khóa';
+
+    if (!window.confirm(`Bạn có chắc muốn ${actionLabel} tài khoản ${user.name}?`)) {
+      return;
+    }
+
+    setStatusLoadingUserId(user.id);
+    try {
+      await api.put(`/users/admin/${user.id}/status`, { is_active: nextIsActive });
+      setUsersList(prev => prev.map(item => (
+        item.id === user.id
+          ? {
+              ...item,
+              isActive: nextIsActive,
+              status: 'offline'
+            }
+          : item
+      )));
+      alert(nextIsActive ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản và đá phiên đăng nhập');
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Có lỗi xảy ra');
+    } finally {
+      setStatusLoadingUserId(null);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -389,6 +419,14 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
                           ADMIN
                         </span>
                       )}
+                      {user.isActive === false && (
+                        <span
+                          className="flex-shrink-0 px-1.5 py-0.5 bg-red-100 text-red-600 rounded-md"
+                          style={{ fontSize: '0.65rem', fontWeight: 700 }}
+                        >
+                          ĐÃ KHÓA
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-400 truncate" style={{ fontSize: '0.78rem' }}>
                       {user.email}
@@ -398,6 +436,22 @@ export function AdminPanel({ currentUser, onBack, onLogout }: Props) {
                   {/* Actions */}
                   {user.id !== currentUser.id && (
                     <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => handleToggleUserStatus(user)}
+                        disabled={statusLoadingUserId === user.id}
+                        className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
+                          user.isActive === false
+                            ? 'hover:bg-green-50 text-gray-400 hover:text-green-600'
+                            : 'hover:bg-yellow-50 text-gray-400 hover:text-yellow-600'
+                        }`}
+                        title={user.isActive === false ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+                      >
+                        {user.isActive === false ? (
+                          <Unlock className="w-4 h-4" />
+                        ) : (
+                          <Lock className="w-4 h-4" />
+                        )}
+                      </button>
                       <button
                         onClick={() => setResetUserId(user.id === resetUserId ? null : user.id)}
                         className="p-2 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors"

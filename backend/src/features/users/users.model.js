@@ -41,6 +41,18 @@ exports.deleteUser = async (userId) => {
   if (error) throw new Error(error.message);
 };
 
+exports.updateUserStatus = async (userId, isActive) => {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ is_active: isActive })
+    .eq('id', userId)
+    .select('id, name, email, avatar, role, is_active, last_seen, created_at')
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+};
+
 exports.updateUserAvatar = async (userId, avatarUrl) => {
   const { error } = await supabase
     .from('users')

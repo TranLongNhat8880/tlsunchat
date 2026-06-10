@@ -12,6 +12,7 @@ export interface User {
   initials: string;
   color: string;
   avatar?: string;
+  isActive?: boolean;
 }
 
 export interface Conversation {
