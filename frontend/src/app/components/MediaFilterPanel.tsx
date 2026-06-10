@@ -1,7 +1,7 @@
 import React from 'react';
 import { ImageIcon, FileText, X, Link as LinkIcon } from 'lucide-react';
 import type { Message, User } from '../../types';
-import { downloadAttachment } from '../../utils/chatHelpers';
+import { downloadAttachment, extractMessageLinks } from '../../utils/chatHelpers';
 
 export type MediaTab = 'images' | 'files' | 'links';
 
@@ -138,13 +138,15 @@ export function MediaFilterPanel({
 
         {tab === 'links' && (
           <div className="space-y-2">
-            {messages.filter(m => m.type === 'text' && typeof m.content === 'string' && m.content.match(/https?:\/\/[^\s]+/g)).map(link => {
-              const urls = link.content.match(/https?:\/\/[^\s]+/g) || [];
-              return urls.map((url, i) => (
+            {messages.map(message => ({
+              message,
+              links: message.type === 'text' ? extractMessageLinks(message.content) : []
+            })).filter(item => item.links.length > 0).map(({ message, links }) => {
+              return links.map((link, i) => (
                 <button
                   type="button"
-                  key={`${link.id}-${i}`}
-                  onClick={() => onLinkClick(url)}
+                  key={`${message.id}-${i}`}
+                  onClick={() => onLinkClick(link.url)}
                   className="w-full text-left flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-green-50 transition-colors cursor-pointer"
                 >
                   <div className="bg-blue-50 p-2 rounded-lg flex-shrink-0">
@@ -155,10 +157,10 @@ export function MediaFilterPanel({
                       Liên kết chia sẻ
                     </p>
                     <p className="text-blue-400 truncate" style={{ fontSize: '0.7rem' }}>
-                      {url}
+                      {link.text}
                     </p>
                     <p className="text-gray-400 mt-0.5" style={{ fontSize: '0.68rem' }}>
-                      {link.timestamp}
+                      {message.timestamp}
                     </p>
                   </div>
                 </button>

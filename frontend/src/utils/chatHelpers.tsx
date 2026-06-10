@@ -62,6 +62,39 @@ export async function downloadAttachment(fileId: string | undefined, fileName: s
   }
 }
 
+const LINK_PATTERN = /((?:https?:\/\/|www\.)[^\s<]+|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}(?:\/[^\s<]*)?)/gi;
+const TRAILING_LINK_PUNCTUATION = /[),.!?:;]+$/;
+
+export function normalizeLinkUrl(url: string) {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+export function extractMessageLinks(content: string | undefined | null) {
+  if (!content || typeof content !== 'string') return [];
+
+  const links: { text: string; url: string; index: number }[] = [];
+  const regex = new RegExp(LINK_PATTERN);
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(content)) !== null) {
+    const raw = match[0];
+    const previousChar = match.index > 0 ? content[match.index - 1] : '';
+    if (previousChar === '@') continue;
+
+    const trailing = raw.match(TRAILING_LINK_PUNCTUATION)?.[0] || '';
+    const text = raw.slice(0, raw.length - trailing.length);
+    if (!text || !text.includes('.')) continue;
+
+    links.push({
+      text,
+      url: normalizeLinkUrl(text),
+      index: match.index
+    });
+  }
+
+  return links;
+}
+
 export function renderMessageContent(
   content: string | undefined | null,
   isMine: boolean,
@@ -70,30 +103,42 @@ export function renderMessageContent(
   if (!content || typeof content !== 'string') {
     return '';
   }
-  const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
-  const parts = content.split(URL_REGEX);
-  if (parts.length === 1) {
+
+  const links = extractMessageLinks(content);
+  if (links.length === 0) {
     return content;
   }
 
-  return parts.map((part, index) => {
-    if (part.match(URL_REGEX)) {
-      return (
-        <span
-          key={index}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onLinkClick(part);
-          }}
-          className={`underline font-medium cursor-pointer break-all inline hover:opacity-85 transition-opacity ${
-            isMine ? 'text-green-100 hover:text-white' : 'text-green-600 hover:text-green-700'
-          }`}
-        >
-          {part}
-        </span>
-      );
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  links.forEach((link, index) => {
+    if (link.index > lastIndex) {
+      nodes.push(content.slice(lastIndex, link.index));
     }
-    return part;
+
+    nodes.push(
+      <span
+        key={`${link.text}-${index}`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onLinkClick(link.url);
+        }}
+        className={`underline font-medium cursor-pointer break-all inline hover:opacity-85 transition-opacity ${
+          isMine ? 'text-green-100 hover:text-white' : 'text-green-600 hover:text-green-700'
+        }`}
+      >
+        {link.text}
+      </span>
+    );
+
+    lastIndex = link.index + link.text.length;
   });
+
+  if (lastIndex < content.length) {
+    nodes.push(content.slice(lastIndex));
+  }
+
+  return nodes;
 }
