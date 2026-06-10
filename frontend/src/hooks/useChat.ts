@@ -66,7 +66,7 @@ const showForegroundNotification = (options: {
 }) => {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
-  const notificationOptions: NotificationOptions = {
+  const notificationOptions: NotificationOptions & { renotify?: boolean } = {
     body: options.body,
     icon: options.icon || '/pwa-192x192.png',
     badge: '/pwa-badge.svg',
