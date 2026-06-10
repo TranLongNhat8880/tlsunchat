@@ -22,13 +22,13 @@ exports.login = catchAsync(async (req, res, next) => {
   });
 });
 
-// Tạo User nội bộ
+// Đăng xuất
 exports.logout = catchAsync(async (req, res, next) => {
   await authService.logout(req.user.id, req.sessionId);
 
   res.status(200).json({
     status: 'success',
-    message: 'Dang xuat thanh cong'
+    message: 'Đăng xuất thành công'
   });
 });
 

@@ -45,7 +45,7 @@ const protect = catchAsync(async (req, res, next) => {
     const session = await authModel.findSessionById(decoded.sid);
     const sessionExpired = session?.expires_at && new Date(session.expires_at).getTime() <= Date.now();
     if (!session || session.user_id !== decoded.id || session.revoked_at || sessionExpired) {
-      return next(new AppError('Phien dang nhap da het hieu luc. Vui long dang nhap lai.', 401));
+      return next(new AppError('Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.', 401));
     }
     req.sessionId = decoded.sid;
   }

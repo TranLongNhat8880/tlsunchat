@@ -49,16 +49,16 @@ exports.login = async (email, password, meta = {}) => {
   const user = await authModel.findByEmail(email);
 
   if (!user) {
-    throw new AppError('Email hoac mat khau khong chinh xac', 401);
+    throw new AppError('Email hoặc mật khẩu không chính xác', 401);
   }
 
   if (!user.is_active) {
-    throw new AppError('Tai khoan cua ban da bi vo hieu hoa', 403);
+    throw new AppError('Tài khoản của bạn đã bị vô hiệu hóa', 403);
   }
 
   const isMatch = await bcrypt.compare(password, user.password_hash);
   if (!isMatch) {
-    throw new AppError('Email hoac mat khau khong chinh xac', 401);
+    throw new AppError('Email hoặc mật khẩu không chính xác', 401);
   }
 
   const session = await authModel.createSession({
@@ -103,18 +103,18 @@ exports.createUser = async (userData) => {
 exports.changePassword = async (userId, oldPassword, newPassword) => {
   const user = await authModel.findById(userId);
   if (!user) {
-    throw new AppError('Nguoi dung khong ton tai', 404);
+    throw new AppError('Người dùng không tồn tại', 404);
   }
 
   if (oldPassword) {
     const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
     if (!isMatch) {
-      throw new AppError('Mat khau cu khong chinh xac', 400);
+      throw new AppError('Mật khẩu cũ không chính xác', 400);
     }
   } else {
     const isDefaultPassword = await bcrypt.compare(DEFAULT_PASSWORD, user.password_hash);
     if (!isDefaultPassword) {
-      throw new AppError('Vui long nhap mat khau cu', 400);
+      throw new AppError('Vui lòng nhập mật khẩu cũ', 400);
     }
   }
 
@@ -124,7 +124,7 @@ exports.changePassword = async (userId, oldPassword, newPassword) => {
 exports.resetPasswordToDefault = async (userId) => {
   const user = await authModel.findById(userId);
   if (!user) {
-    throw new AppError('Nguoi dung khong ton tai', 404);
+    throw new AppError('Người dùng không tồn tại', 404);
   }
 
   await updatePassword(userId, DEFAULT_PASSWORD);
