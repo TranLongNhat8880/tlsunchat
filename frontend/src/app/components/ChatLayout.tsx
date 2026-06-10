@@ -924,7 +924,7 @@ export function ChatLayout({
                 ? 'bg-green-100 text-green-600'
                 : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'
                 }`}
-              title="TÃ¹y chá»n cuá»™c trÃ² chuyá»‡n"
+              title="Tùy chọn cuộc trò chuyện"
             >
               <MoreVertical className="w-4 h-4" />
             </button>
@@ -938,7 +938,7 @@ export function ChatLayout({
                   style={{ fontSize: '0.82rem', fontWeight: 500 }}
                 >
                   <Eraser className="w-4 h-4 text-gray-400" />
-                  <span>XÃ³a lá»‹ch sá»­ hiá»ƒn thá»‹</span>
+                  <span>Xóa lịch sử hiển thị</span>
                 </button>
                 <button
                   type="button"
@@ -951,7 +951,7 @@ export function ChatLayout({
                   ) : (
                     <Trash2 className="w-4 h-4 text-red-500" />
                   )}
-                  <span>{selectedConv.type === 'group' ? 'Rá»i khá»i nhÃ³m' : 'XÃ³a cuá»™c trÃ² chuyá»‡n'}</span>
+                  <span>{selectedConv.type === 'group' ? 'Rời khỏi nhóm' : 'Xóa cuộc trò chuyện'}</span>
                 </button>
               </div>
             )}
