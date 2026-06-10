@@ -66,11 +66,11 @@ exports.updateUserStatus = catchAsync(async (req, res, next) => {
   const { is_active: isActive } = req.body;
 
   if (id === req.user.id) {
-    return next(new AppError('Khong the tu khoa hoac mo khoa tai khoan cua chinh minh', 400));
+    return next(new AppError('Không thể tự khóa hoặc mở khóa tài khoản của chính mình', 400));
   }
 
   if (typeof isActive !== 'boolean') {
-    return next(new AppError('Vui long cung cap is_active dang boolean', 400));
+    return next(new AppError('Vui lòng cung cấp is_active dạng boolean', 400));
   }
 
   const updatedUser = await require('./users.model').updateUserStatus(id, isActive);
@@ -87,7 +87,7 @@ exports.updateUserStatus = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    message: isActive ? 'Da mo khoa tai khoan' : 'Da khoa tai khoan',
+    message: isActive ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản',
     data: { user: updatedUser }
   });
 });
