@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   MessageCircle, Search, LogOut, ChevronLeft, Send, Paperclip, Smile,
-  MoreVertical, Download, X, Shield, ImageIcon, Phone, Info,
-  Bell, Settings, Video, Plus, ChevronRight, AlertTriangle, FileText
+  MoreVertical, Download, X, Shield, ImageIcon, Info,
+  Bell, Settings, Video, Plus, ChevronRight, AlertTriangle, FileText, Eraser, Trash2, UserMinus
 } from 'lucide-react';
 import type { User, Conversation, Message } from '../App';
 import { CreateGroupModal } from './CreateGroupModal';
@@ -77,6 +77,7 @@ export function ChatLayout({
   const [mediaTab, setMediaTab] = useState<MediaTab>('images');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showRoomMenu, setShowRoomMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -88,6 +89,7 @@ export function ChatLayout({
   const [pendingExternalLink, setPendingExternalLink] = useState<string | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
+  const roomMenuRef = useRef<HTMLDivElement>(null);
   const [recallConfirm, setRecallConfirm] = useState<{ messages: Message[], label: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -112,7 +114,9 @@ export function ChatLayout({
     togglePin,
     pinMessage,
     reactToMessage,
-    recallMessage
+    recallMessage,
+    clearRoomHistory,
+    leaveRoom
   } = useChat(currentUser, selectedConvId);
 
   const getAttachmentType = (file: File): PendingAttachment['type'] => {
@@ -345,6 +349,41 @@ export function ChatLayout({
     }
   };
 
+  const handleClearRoomHistory = () => {
+    if (!selectedConv) return;
+    const ok = window.confirm('Xóa lịch sử hiển thị của cuộc trò chuyện này trên thiết bị của bạn?');
+    if (!ok) return;
+
+    clearPendingAttachments();
+    closeImageViewer();
+    setReplyTo(null);
+    clearRoomHistory(selectedConv.id);
+    setShowRoomMenu(false);
+  };
+
+  const handleLeaveOrDeleteRoom = async () => {
+    if (!selectedConv) return;
+
+    const isGroup = selectedConv.type === 'group';
+    const label = isGroup ? 'rời khỏi nhóm này' : 'xóa cuộc trò chuyện này khỏi sidebar của bạn';
+    const ok = window.confirm(`Bạn chắc chắn muốn ${label}?`);
+    if (!ok) return;
+
+    try {
+      clearPendingAttachments();
+      closeImageViewer();
+      setShowInfo(false);
+      setReplyTo(null);
+      await leaveRoom(selectedConv.id);
+      setSelectedConvId(null);
+      setMobileShowChat(false);
+      setShowRoomMenu(false);
+    } catch (error) {
+      console.error('Không thể cập nhật cuộc trò chuyện:', error);
+      alert('Không thể cập nhật cuộc trò chuyện. Vui lòng thử lại.');
+    }
+  };
+
   const scrollToMessage = (messageId: string) => {
     let target = messageRefs.current[messageId];
     if (!target) {
@@ -438,12 +477,15 @@ export function ChatLayout({
           setShowEmojiPicker(false);
         }
       }
+      if (showRoomMenu && roomMenuRef.current && !roomMenuRef.current.contains(event.target as Node)) {
+        setShowRoomMenu(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showEmojiPicker]);
+  }, [showEmojiPicker, showRoomMenu]);
 
   const getPinnedPreview = (message: Message) => {
     if (message.content === '__MESSAGE_RECALLED__') return 'Tin nhắn đã thu hồi';
@@ -864,9 +906,6 @@ export function ChatLayout({
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors hidden sm:flex">
-            <Phone className="w-4 h-4" />
-          </button>
           <button
             onClick={() => setShowInfo(!showInfo)}
             className={`p-2 rounded-full transition-colors ${showInfo
@@ -877,9 +916,46 @@ export function ChatLayout({
           >
             <Info className="w-4 h-4" />
           </button>
-          <button className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
-            <MoreVertical className="w-4 h-4" />
-          </button>
+          <div className="relative" ref={roomMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowRoomMenu(prev => !prev)}
+              className={`p-2 rounded-full transition-colors ${showRoomMenu
+                ? 'bg-green-100 text-green-600'
+                : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'
+                }`}
+              title="TÃ¹y chá»n cuá»™c trÃ² chuyá»‡n"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {showRoomMenu && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl shadow-gray-200/60 py-1.5 z-50 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={handleClearRoomHistory}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors"
+                  style={{ fontSize: '0.82rem', fontWeight: 500 }}
+                >
+                  <Eraser className="w-4 h-4 text-gray-400" />
+                  <span>XÃ³a lá»‹ch sá»­ hiá»ƒn thá»‹</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLeaveOrDeleteRoom}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors"
+                  style={{ fontSize: '0.82rem', fontWeight: 600 }}
+                >
+                  {selectedConv.type === 'group' ? (
+                    <UserMinus className="w-4 h-4 text-red-500" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  )}
+                  <span>{selectedConv.type === 'group' ? 'Rá»i khá»i nhÃ³m' : 'XÃ³a cuá»™c trÃ² chuyá»‡n'}</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

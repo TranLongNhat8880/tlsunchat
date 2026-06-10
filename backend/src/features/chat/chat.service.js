@@ -80,3 +80,27 @@ exports.togglePinRoom = async (roomId, userId) => {
     throw new AppError('Không thể ghim phòng chat', 500);
   }
 };
+
+exports.leaveRoom = async (roomId, userId) => {
+  const member = await chatModel.checkRoomMembership(roomId, userId);
+  if (!member) {
+    throw new AppError('Khong tim thay phong', 404);
+  }
+
+  const room = await chatModel.findRoomById(roomId);
+  if (!room) {
+    throw new AppError('Khong tim thay phong', 404);
+  }
+
+  try {
+    await chatModel.removeRoomMember(roomId, userId);
+    const memberCount = await chatModel.countRoomMembers(roomId);
+    if (memberCount === 0) {
+      await chatModel.deleteRoom(roomId);
+    }
+
+    return { roomId, type: room.type };
+  } catch (error) {
+    throw new AppError('Khong the cap nhat cuoc tro chuyen', 500);
+  }
+};

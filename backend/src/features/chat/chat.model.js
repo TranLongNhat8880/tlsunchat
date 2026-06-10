@@ -32,6 +32,17 @@ exports.findLastMessageForRoom = async (roomId) => {
   return data && data.length > 0 ? data[0] : null;
 };
 
+exports.findRoomById = async (roomId) => {
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('id, type')
+    .eq('id', roomId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+  return data;
+};
+
 exports.checkRoomMembership = async (roomId, userId) => {
   const { data, error } = await supabase
     .from('room_members')
@@ -42,6 +53,16 @@ exports.checkRoomMembership = async (roomId, userId) => {
 
   if (error && error.code !== 'PGRST116') throw new Error(error.message);
   return data;
+};
+
+exports.removeRoomMember = async (roomId, userId) => {
+  const { error } = await supabase
+    .from('room_members')
+    .delete()
+    .eq('room_id', roomId)
+    .eq('user_id', userId);
+
+  if (error) throw new Error(error.message);
 };
 
 exports.findMessagesByRoomId = async (roomId, limit = 50) => {
@@ -141,6 +162,16 @@ exports.getRoomMemberIds = async (roomId) => {
 
   if (error) throw new Error(error.message);
   return data;
+};
+
+exports.countRoomMembers = async (roomId) => {
+  const { count, error } = await supabase
+    .from('room_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('room_id', roomId);
+
+  if (error) throw new Error(error.message);
+  return count || 0;
 };
 
 exports.findMessageRoom = async (messageId) => {

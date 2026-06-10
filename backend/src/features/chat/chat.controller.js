@@ -62,6 +62,18 @@ exports.togglePinRoom = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.leaveRoom = catchAsync(async (req, res, next) => {
+  const result = await chatService.leaveRoom(req.params.roomId, req.user.id);
+
+  const { getIo } = require('../../websockets/socket.manager');
+  getIo().to(req.user.id).emit('room_left', { roomId: req.params.roomId });
+
+  res.status(200).json({
+    status: 'success',
+    data: result
+  });
+});
+
 exports.pinMessage = catchAsync(async (req, res, next) => {
   const { isPinned } = req.body;
   const message = await chatModel.findMessageRoom(req.params.messageId);

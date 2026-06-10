@@ -109,7 +109,6 @@ const getFirstFile = (files: any) => Array.isArray(files) ? files[0] : files;
 const formatMessageFromApi = (m: any, status: Message['status'] = 'sent'): Message => {
   const file = getFirstFile(m.files);
   const validReply = Boolean(m.reply_to?.id && (m.reply_to.content || m.reply_to.type));
-
   return {
     id: m.id,
     conversationId: m.room_id,
@@ -154,6 +153,31 @@ const setStoredReadTime = (userId: string, roomId: string, readTime: number) => 
   }
 };
 
+const getStoredClearTimes = (userId: string): Record<string, number> => {
+  try {
+    const data = localStorage.getItem(`tlsunchat_room_clear_times_${userId}`);
+    return data ? JSON.parse(data) : {};
+  } catch (e) {
+    return {};
+  }
+};
+
+const setStoredClearTime = (userId: string, roomId: string, clearTime: number) => {
+  try {
+    const clearTimes = getStoredClearTimes(userId);
+    clearTimes[roomId] = clearTime;
+    localStorage.setItem(`tlsunchat_room_clear_times_${userId}`, JSON.stringify(clearTimes));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const isMessageAfterClearTime = (userId: string | undefined, roomId: string, createdAt?: string) => {
+  if (!userId || !createdAt) return true;
+  const clearTime = getStoredClearTimes(userId)[roomId] || 0;
+  return new Date(createdAt).getTime() > clearTime;
+};
+
 const seedStoredReadTimes = (userId: string, rooms: any[]) => {
   try {
     const readTimes = getStoredReadTimes(userId);
@@ -185,7 +209,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
   const formatRoomFromApi = (r: any, selectedId: string | null): Conversation => {
     const room = r.rooms;
     const participants = room.room_members?.map((m: any) => m.user_id) || [];
-    const lastMsgObj = r.last_message;
+    const lastMsgObj = isMessageAfterClearTime(currentUser?.id, room.id, r.last_message?.created_at)
+      ? r.last_message
+      : null;
     let lastMsgText = 'Bắt đầu trò chuyện...';
     let lastTimeText = '';
     let updatedAt = 0;
@@ -458,6 +484,15 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       }).catch(err => console.error('Failed to reload rooms after recall', err));
     });
 
+    socketRef.current.on('room_left', (data: { roomId: string }) => {
+      setConversations(prev => prev.filter(c => c.id !== data.roomId));
+      setMessages(prev => {
+        const next = { ...prev };
+        delete next[data.roomId];
+        return next;
+      });
+    });
+
     socketRef.current.on('group_created', (newRoom: any) => {
       // Khi có nhóm mới tạo, fetch lại danh sách nhóm
       api.get('/chat/rooms').then(res => {
@@ -519,6 +554,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       socketRef.current?.off('message_pinned');
       socketRef.current?.off('message_reacted');
       socketRef.current?.off('message_recalled');
+      socketRef.current?.off('room_left');
       socketRef.current?.off('presence_snapshot');
       socketRef.current?.off('presence_update');
       socketRef.current?.disconnect();
@@ -540,38 +576,9 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
     api.get(`/chat/rooms/${selectedConvId}/messages`).then(res => {
       const rawMsgs = res.data.data.messages;
-      const formattedMsgs: Message[] = rawMsgs.map((m: any) => ({
-        id: m.id,
-        conversationId: m.room_id,
-        senderId: m.sender_id,
-        content: m.content,
-        type: m.type,
-        timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        createdAt: m.created_at,
-        status: 'seen',
-        fileId: m.files?.[0]?.id,
-        fileName: m.files?.[0]?.original_name,
-        fileSize: m.files?.[0]?.file_size ? `${(m.files[0].file_size / 1024 / 1024).toFixed(2)} MB` : undefined,
-        fileUrl: m.files?.[0] ? getFilePreviewUrl(m.files[0]) : undefined,
-        isPinned: m.is_pinned,
-        reactions: m.reactions ? 
-          Object.entries(m.reactions).reduce((acc: any[], [userId, emoji]) => {
-            const existing = acc.find(x => x.emoji === emoji);
-            if (existing) existing.userIds.push(userId);
-            else acc.push({ emoji, userIds: [userId] });
-            return acc;
-          }, []) 
-        : undefined,
-        replyToId: m.reply_to?.id && (m.reply_to.content || m.reply_to.type)
-          ? (m.reply_to_id || m.reply_to.id)
-          : undefined,
-        replyTo: m.reply_to?.id && (m.reply_to.content || m.reply_to.type) ? {
-          id: m.reply_to.id,
-          content: m.reply_to.content,
-          type: m.reply_to.type,
-          userName: m.reply_to.users?.name || ''
-        } : undefined
-      }));
+      const formattedMsgs: Message[] = rawMsgs
+        .filter((m: any) => isMessageAfterClearTime(currentUser?.id, selectedConvId, m.created_at))
+        .map((m: any) => formatMessageFromApi(m, 'seen'));
 
       setMessages(prev => ({
         ...prev,
@@ -958,6 +965,35 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     }
   };
 
+  const clearRoomHistory = (roomId: string) => {
+    if (!currentUser?.id) return;
+
+    const clearTime = Date.now();
+    setStoredClearTime(currentUser.id, roomId, clearTime);
+    setStoredReadTime(currentUser.id, roomId, clearTime);
+    setMessages(prev => ({
+      ...prev,
+      [roomId]: []
+    }));
+    setConversations(prev => prev.map(c => c.id === roomId ? {
+      ...c,
+      lastMessage: 'Bắt đầu trò chuyện...',
+      lastTime: '',
+      updatedAt: 0,
+      unread: 0
+    } : c));
+  };
+
+  const leaveRoom = async (roomId: string) => {
+    await api.delete(`/chat/rooms/${roomId}/membership`);
+    setConversations(prev => prev.filter(c => c.id !== roomId));
+    setMessages(prev => {
+      const next = { ...prev };
+      delete next[roomId];
+      return next;
+    });
+  };
+
   return {
     users,
     conversations,
@@ -969,6 +1005,8 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     togglePin,
     pinMessage,
     reactToMessage,
-    recallMessage
+    recallMessage,
+    clearRoomHistory,
+    leaveRoom
   };
 }

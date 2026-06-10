@@ -11,6 +11,7 @@ router.get('/rooms', chatController.getMyRooms);
 router.post('/rooms', chatController.createRoom);
 router.get('/rooms/:roomId/messages', chatController.getRoomMessages);
 router.put('/rooms/:roomId/pin', chatController.togglePinRoom);
+router.delete('/rooms/:roomId/membership', chatController.leaveRoom);
 router.put('/messages/:messageId/pin', chatController.pinMessage);
 router.put('/messages/:messageId/react', chatController.reactToMessage);
 router.put('/messages/:messageId/recall', chatController.recallMessage);
