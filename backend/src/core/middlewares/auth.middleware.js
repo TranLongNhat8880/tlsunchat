@@ -3,6 +3,7 @@ const AppError = require('../errors/AppError');
 const catchAsync = require('../utils/catchAsync');
 const supabase = require('../../config/database');
 const { getPasswordTokenVersion } = require('../utils/tokenFingerprint');
+const authModel = require('../../features/auth/auth.model');
 
 const protect = catchAsync(async (req, res, next) => {
   // 1. Lấy token từ header
@@ -38,6 +39,15 @@ const protect = catchAsync(async (req, res, next) => {
   // 4. Cho phép đi tiếp, nhét thông tin user vào req
   if (!decoded.pwdv || decoded.pwdv !== getPasswordTokenVersion(user.password_hash)) {
     return next(new AppError('Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.', 401));
+  }
+
+  if (decoded.sid) {
+    const session = await authModel.findSessionById(decoded.sid);
+    const sessionExpired = session?.expires_at && new Date(session.expires_at).getTime() <= Date.now();
+    if (!session || session.user_id !== decoded.id || session.revoked_at || sessionExpired) {
+      return next(new AppError('Phien dang nhap da het hieu luc. Vui long dang nhap lai.', 401));
+    }
+    req.sessionId = decoded.sid;
   }
 
   user.password_hash = undefined;

@@ -11,6 +11,7 @@ router.post('/login', authController.login);
 router.use(protect);
 
 router.get('/me', authController.getMe);
+router.post('/logout', authController.logout);
 router.put('/change-password', authController.changePassword);
 
 // Chỉ Admin mới được tạo user

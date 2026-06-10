@@ -85,6 +85,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      api.post('/auth/logout', null, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(error => {
+        console.warn('Logout session revoke failed:', error);
+      });
+    }
+
     localStorage.removeItem('token');
     localStorage.removeItem('requirePasswordChange');
     setRequirePasswordChange(false);

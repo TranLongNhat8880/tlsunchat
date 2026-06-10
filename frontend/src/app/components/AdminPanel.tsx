@@ -110,7 +110,7 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 Mật khẩu tạm thời
               </p>
               <p className="text-green-600 mt-1" style={{ fontSize: '0.85rem', fontWeight: 700 }}>
-                Abc@123456
+                123456
               </p>
               <p className="text-green-500 mt-1" style={{ fontSize: '0.72rem' }}>
                 Nhắc nhân viên đổi mật khẩu khi đăng nhập lần đầu

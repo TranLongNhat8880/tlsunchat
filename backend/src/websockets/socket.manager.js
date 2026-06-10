@@ -1,6 +1,7 @@
 const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
 const chatModel = require('../features/chat/chat.model');
+const authModel = require('../features/auth/auth.model');
 const pushService = require('../features/push/push.service');
 const supabase = require('../config/database');
 const { getPasswordTokenVersion } = require('../core/utils/tokenFingerprint');
@@ -63,6 +64,14 @@ const init = (server) => {
 
       if (!decoded.pwdv || decoded.pwdv !== getPasswordTokenVersion(user.password_hash)) {
         return next(new Error('Authentication error: Expired session'));
+      }
+
+      if (decoded.sid) {
+        const session = await authModel.findSessionById(decoded.sid);
+        const sessionExpired = session?.expires_at && new Date(session.expires_at).getTime() <= Date.now();
+        if (!session || session.user_id !== decoded.id || session.revoked_at || sessionExpired) {
+          return next(new Error('Authentication error: Expired session'));
+        }
       }
 
       socket.user = { id: user.id, role: user.role };

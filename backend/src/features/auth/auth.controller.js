@@ -9,7 +9,10 @@ exports.login = catchAsync(async (req, res, next) => {
   if (error) return next(new AppError(error.details[0].message, 400));
 
   const { email, password } = value;
-  const result = await authService.login(email, password);
+  const result = await authService.login(email, password, {
+    userAgent: req.get('user-agent'),
+    ipAddress: req.ip
+  });
 
   res.status(200).json({
     status: 'success',
@@ -20,6 +23,15 @@ exports.login = catchAsync(async (req, res, next) => {
 });
 
 // Tạo User nội bộ
+exports.logout = catchAsync(async (req, res, next) => {
+  await authService.logout(req.user.id, req.sessionId);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Dang xuat thanh cong'
+  });
+});
+
 exports.createUser = catchAsync(async (req, res, next) => {
   const { error, value } = createUserSchema.validate(req.body);
   if (error) return next(new AppError(error.details[0].message, 400));

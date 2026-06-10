@@ -6,12 +6,36 @@ const { getPasswordTokenVersion } = require('../../core/utils/tokenFingerprint')
 
 const DEFAULT_PASSWORD = '123456';
 
-const signToken = (user) => {
-  return jwt.sign({
+const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || '8h';
+
+const parseDurationMs = (value) => {
+  if (typeof value === 'number') return value * 1000;
+  const match = String(value || '').trim().match(/^(\d+)\s*([smhd])?$/i);
+  if (!match) return 8 * 60 * 60 * 1000;
+
+  const amount = Number(match[1]);
+  const unit = (match[2] || 's').toLowerCase();
+  const multipliers = {
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000
+  };
+  return amount * multipliers[unit];
+};
+
+const getTokenExpiresAt = () => new Date(Date.now() + parseDurationMs(getJwtExpiresIn()));
+
+const signToken = (user, sessionId = null) => {
+  const payload = {
     id: user.id,
     pwdv: getPasswordTokenVersion(user.password_hash)
-  }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '8h'
+  };
+
+  if (sessionId) payload.sid = sessionId;
+
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: getJwtExpiresIn()
   });
 };
 
@@ -21,7 +45,7 @@ const updatePassword = async (userId, newPassword) => {
   await authModel.updatePassword(userId, password_hash);
 };
 
-exports.login = async (email, password) => {
+exports.login = async (email, password, meta = {}) => {
   const user = await authModel.findByEmail(email);
 
   if (!user) {
@@ -37,11 +61,22 @@ exports.login = async (email, password) => {
     throw new AppError('Email hoac mat khau khong chinh xac', 401);
   }
 
-  const token = signToken(user);
+  const session = await authModel.createSession({
+    user_id: user.id,
+    expires_at: getTokenExpiresAt().toISOString(),
+    user_agent: meta.userAgent || null,
+    ip_address: meta.ipAddress || null
+  });
+  const token = signToken(user, session?.id);
   const requirePasswordChange = password === DEFAULT_PASSWORD;
   user.password_hash = undefined;
 
   return { token, user, requirePasswordChange };
+};
+
+exports.logout = async (userId, sessionId) => {
+  if (!sessionId) return;
+  await authModel.revokeSession(sessionId, userId);
 };
 
 exports.createUser = async (userData) => {
