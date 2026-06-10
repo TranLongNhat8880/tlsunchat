@@ -138,7 +138,7 @@ export function MediaFilterPanel({
 
         {tab === 'links' && (
           <div className="space-y-2">
-            {messages.filter(m => m.type === 'text' && m.content.match(/https?:\/\/[^\s]+/g)).map(link => {
+            {messages.filter(m => m.type === 'text' && typeof m.content === 'string' && m.content.match(/https?:\/\/[^\s]+/g)).map(link => {
               const urls = link.content.match(/https?:\/\/[^\s]+/g) || [];
               return urls.map((url, i) => (
                 <button

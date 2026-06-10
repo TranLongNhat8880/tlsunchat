@@ -63,10 +63,13 @@ export async function downloadAttachment(fileId: string | undefined, fileName: s
 }
 
 export function renderMessageContent(
-  content: string,
+  content: string | undefined | null,
   isMine: boolean,
   onLinkClick: (url: string) => void
 ) {
+  if (!content || typeof content !== 'string') {
+    return '';
+  }
   const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
   const parts = content.split(URL_REGEX);
   if (parts.length === 1) {
