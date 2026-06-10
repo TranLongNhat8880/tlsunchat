@@ -4,7 +4,7 @@ import {
   MessageCircle, Search, LogOut, ChevronLeft, Send, Paperclip, Smile,
   MoreVertical, CheckCheck, Check, Reply, Download, Users, X,
   Shield, FileText, ImageIcon, Link as LinkIcon, Phone, Info,
-  Bell, Settings, Trash2, Mic, Video, Plus, ChevronRight
+  Bell, Settings, Trash2, Mic, Video, Plus, ChevronRight, AlertTriangle
 } from 'lucide-react';
 import type { User, Conversation, Message } from '../App';
 import { CreateGroupModal } from './CreateGroupModal';
@@ -179,6 +179,40 @@ function TypingIndicator({ user }: { user: User }) {
   );
 }
 
+// ─── Message Link Parser Helper ──────────────────────────────────────────────
+function renderMessageContent(
+  content: string,
+  isMine: boolean,
+  onLinkClick: (url: string) => void
+) {
+  const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
+  const parts = content.split(URL_REGEX);
+  if (parts.length === 1) {
+    return content;
+  }
+
+  return parts.map((part, index) => {
+    if (part.match(URL_REGEX)) {
+      return (
+        <span
+          key={index}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onLinkClick(part);
+          }}
+          className={`underline font-medium cursor-pointer break-all inline hover:opacity-85 transition-opacity ${
+            isMine ? 'text-green-100 hover:text-white' : 'text-green-600 hover:text-green-700'
+          }`}
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 // ─── Message Bubble ──────────────────────────────────────────────────────────
 function MessageBubble({
   msg,
@@ -192,6 +226,7 @@ function MessageBubble({
   onReact,
   onRecall,
   onOpenImage,
+  onLinkClick,
 }: {
   msg: Message;
   isMine: boolean;
@@ -204,6 +239,7 @@ function MessageBubble({
   onReact: (m: Message, emoji: string) => void;
   onRecall: (m: Message, group?: Message[]) => void;
   onOpenImage: (m: Message, group?: Message[]) => void;
+  onLinkClick: (url: string) => void;
 }) {
   const [showActions, setShowActions] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -542,7 +578,9 @@ function MessageBubble({
                   : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-tl-sm'
                   }`}
               >
-                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" style={{ fontSize: '0.9rem', lineHeight: '1.45' }}>{msg.content}</p>
+                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" style={{ fontSize: '0.9rem', lineHeight: '1.45' }}>
+                  {renderMessageContent(msg.content, isMine, onLinkClick)}
+                </p>
               </div>
             )}
 
@@ -903,6 +941,9 @@ export function ChatLayout({
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [imageViewer, setImageViewer] = useState<ImageViewerState | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [pendingExternalLink, setPendingExternalLink] = useState<string | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const [recallConfirm, setRecallConfirm] = useState<{ messages: Message[], label: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1240,6 +1281,25 @@ export function ChatLayout({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [imageViewer]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (showEmojiPicker) {
+        if (
+          emojiPickerRef.current &&
+          !emojiPickerRef.current.contains(event.target as Node) &&
+          emojiButtonRef.current &&
+          !emojiButtonRef.current.contains(event.target as Node)
+        ) {
+          setShowEmojiPicker(false);
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
 
   const getPinnedPreview = (message: Message) => {
     if (message.content === '__MESSAGE_RECALLED__') return 'Tin nhắn đã thu hồi';
@@ -1801,6 +1861,7 @@ export function ChatLayout({
                     onReact={(m, emoji) => reactToMessage(m.id, emoji)}
                     onRecall={handleRecallMessage}
                     onOpenImage={openImageViewer}
+                    onLinkClick={setPendingExternalLink}
                   />
                 </div>
               );
@@ -1902,7 +1963,10 @@ export function ChatLayout({
             />
 
             {showEmojiPicker && (
-              <div className="absolute bottom-[calc(100%+10px)] left-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-gray-100">
+              <div
+                ref={emojiPickerRef}
+                className="absolute bottom-[calc(100%+10px)] left-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-gray-100"
+              >
                 <EmojiPicker
                   onEmojiClick={(e) => {
                     setInputText(prev => prev + e.emoji);
@@ -1911,6 +1975,7 @@ export function ChatLayout({
               </div>
             )}
             <button
+              ref={emojiButtonRef}
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               className={`p-2 rounded-full transition-colors flex-shrink-0 ${showEmojiPicker ? 'bg-green-100 text-green-500' : 'hover:bg-gray-100 text-gray-400 hover:text-green-500'}`}
             >
@@ -2114,6 +2179,55 @@ export function ChatLayout({
 
       {showSettings && (
         <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
+
+      {pendingExternalLink && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/40 flex items-center justify-center p-4 transition-opacity"
+          onClick={() => setPendingExternalLink(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl transform transition-transform duration-300 scale-100 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0 text-amber-500">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-gray-900 font-bold text-lg">Cảnh báo liên kết ngoài</h3>
+                <p className="text-gray-500 text-sm mt-1">
+                  Bạn đang rời khỏi ứng dụng để truy cập một liên kết ngoài. Hãy chắc chắn rằng bạn tin tưởng liên kết này.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 mb-6">
+              <span className="text-xs text-gray-400 font-semibold uppercase block mb-1">Liên kết đích:</span>
+              <p className="text-gray-700 text-sm break-all font-medium select-all hover:text-green-600 transition-colors">
+                {pendingExternalLink}
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setPendingExternalLink(null)}
+                className="px-4 py-2 rounded-xl text-gray-600 font-semibold hover:bg-gray-100 transition-colors"
+                style={{ fontSize: '0.9rem' }}
+              >
+                Quay lại
+              </button>
+              <a
+                href={pendingExternalLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setPendingExternalLink(null)}
+                className="px-4 py-2 rounded-xl bg-green-500 text-white font-semibold hover:bg-green-600 shadow-md shadow-green-200 transition-all flex items-center justify-center"
+                style={{ fontSize: '0.9rem' }}
+              >
+                Tiếp tục
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
