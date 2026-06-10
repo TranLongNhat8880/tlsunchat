@@ -1939,7 +1939,7 @@ export function ChatLayout({
               onFocus={() => setShowEmojiPicker(false)}
               placeholder={isUploading ? "Đang tải file lên..." : "Nhập tin nhắn..."}
               disabled={isUploading}
-              className="flex-1 bg-gray-100 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400 focus:bg-white transition-all disabled:opacity-50"
+              className="flex-1 min-w-0 bg-gray-100 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400 focus:bg-white transition-all disabled:opacity-50"
               style={{ fontSize: '16px' }}
             />
             <button
