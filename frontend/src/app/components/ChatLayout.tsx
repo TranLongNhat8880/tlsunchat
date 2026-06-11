@@ -192,19 +192,14 @@ export function ChatLayout({
       return;
     }
 
-    const hasAttachments = attachmentsToSend.length > 0;
-    if (hasAttachments) {
-      setIsUploading(true);
-    }
+    setIsUploading(true);
     try {
       const type = file.type.startsWith('image/') ? 'image' : 'file';
       await sendFileMessage(selectedConvId, file, type);
     } catch (error: any) {
       alert(error.message || 'Có lỗi xảy ra khi tải file lên');
     } finally {
-      if (hasAttachments) {
-        setIsUploading(false);
-      }
+      setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -583,13 +578,16 @@ export function ChatLayout({
 
     const text = inputText.trim();
     const attachmentsToSend = pendingAttachments;
+    const hasAttachments = attachmentsToSend.length > 0;
     if (!text && attachmentsToSend.length === 0) return;
 
     setInputText('');
     setReplyTo(null);
     clearPendingAttachments();
     window.setTimeout(() => inputRef.current?.focus(), 0);
-    setIsUploading(true);
+    if (hasAttachments) {
+      setIsUploading(true);
+    }
 
     try {
       if (text) {
@@ -608,7 +606,9 @@ export function ChatLayout({
     } catch (error: any) {
       alert(error.message || 'Có lỗi xảy ra khi gửi file');
     } finally {
-      setIsUploading(false);
+      if (hasAttachments) {
+        setIsUploading(false);
+      }
       window.setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
