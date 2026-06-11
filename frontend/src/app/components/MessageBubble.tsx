@@ -140,13 +140,13 @@ export function MessageBubble({
                 }`}
             >
               <span
-                className={isMine ? 'text-green-100' : 'text-gray-400'}
+                className={isMine ? 'text-green-700' : 'text-gray-400'}
                 style={{ fontSize: '0.72rem', fontWeight: 600 }}
               >
                 {replyAuthor || 'Tin nhắn'}
               </span>
               <p
-                className={`truncate ${isMine ? 'text-green-100' : 'text-gray-500'}`}
+                className={`truncate ${isMine ? 'text-green-800' : 'text-gray-500'}`}
                 style={{ fontSize: '0.72rem' }}
               >
                 {replyPreview}
