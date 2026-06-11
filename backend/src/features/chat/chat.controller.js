@@ -15,11 +15,14 @@ exports.getMyRooms = catchAsync(async (req, res, next) => {
 
 // Lấy lịch sử tin nhắn của một phòng
 exports.getRoomMessages = catchAsync(async (req, res, next) => {
-  const messages = await chatService.getRoomMessages(req.params.roomId, req.user.id);
+  const result = await chatService.getRoomMessages(req.params.roomId, req.user.id, {
+    limit: req.query.limit,
+    before: req.query.before
+  });
 
   res.status(200).json({
     status: 'success',
-    data: { messages }
+    data: result
   });
 });
 

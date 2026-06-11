@@ -57,6 +57,7 @@ const uploadWithProgress = (
 });
 
 const notificationAudio = new Audio('/notnew.mp3');
+const MESSAGE_PAGE_SIZE = 50;
 
 const showForegroundNotification = (options: {
   title: string;
@@ -134,6 +135,14 @@ const formatMessageFromApi = (m: any, status: Message['status'] = 'sent'): Messa
   };
 };
 
+const mergeOlderMessages = (olderMessages: Message[], currentMessages: Message[]) => {
+  const existingIds = new Set(currentMessages.map(message => message.id));
+  return [
+    ...olderMessages.filter(message => !existingIds.has(message.id)),
+    ...currentMessages
+  ];
+};
+
 const getStoredReadTimes = (userId: string): Record<string, number> => {
   try {
     const data = localStorage.getItem(`tlsunchat_room_read_times_${userId}`);
@@ -179,6 +188,11 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
   const [users, setUsers] = useState<User[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
+  const [messagePaging, setMessagePaging] = useState<Record<string, {
+    hasMore: boolean;
+    oldestCursor: string | null;
+    isLoadingOlder: boolean;
+  }>>({});
   const socketRef = useRef<Socket | null>(null);
 
   const formatRoomFromApi = (r: any, selectedId: string | null): Conversation => {
@@ -547,13 +561,21 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     // Nếu đã tải rồi thì không tải lại
     if (messages[selectedConvId]) return;
 
-    api.get(`/chat/rooms/${selectedConvId}/messages`).then(res => {
+    api.get(`/chat/rooms/${selectedConvId}/messages?limit=${MESSAGE_PAGE_SIZE}`).then(res => {
       const rawMsgs = res.data.data.messages;
       const formattedMsgs: Message[] = rawMsgs.map((m: any) => formatMessageFromApi(m, 'seen'));
 
       setMessages(prev => ({
         ...prev,
         [selectedConvId]: formattedMsgs
+      }));
+      setMessagePaging(prev => ({
+        ...prev,
+        [selectedConvId]: {
+          hasMore: Boolean(res.data.data.pagination?.hasMore),
+          oldestCursor: res.data.data.pagination?.oldestCursor || null,
+          isLoadingOlder: false
+        }
       }));
     });
 
@@ -960,6 +982,53 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
   };
 
   // 5. Hàm Ghim/Bỏ ghim
+  const loadOlderMessages = async (roomId: string) => {
+    const paging = messagePaging[roomId];
+    if (!paging?.hasMore || paging.isLoadingOlder || !paging.oldestCursor) {
+      return { loaded: 0 };
+    }
+
+    setMessagePaging(prev => ({
+      ...prev,
+      [roomId]: {
+        ...prev[roomId],
+        isLoadingOlder: true
+      }
+    }));
+
+    try {
+      const { data } = await api.get(
+        `/chat/rooms/${roomId}/messages?limit=${MESSAGE_PAGE_SIZE}&before=${encodeURIComponent(paging.oldestCursor)}`
+      );
+      const formattedMessages: Message[] = data.data.messages.map((m: any) => formatMessageFromApi(m, 'seen'));
+
+      setMessages(prev => ({
+        ...prev,
+        [roomId]: mergeOlderMessages(formattedMessages, prev[roomId] || [])
+      }));
+
+      setMessagePaging(prev => ({
+        ...prev,
+        [roomId]: {
+          hasMore: Boolean(data.data.pagination?.hasMore),
+          oldestCursor: data.data.pagination?.oldestCursor || paging.oldestCursor,
+          isLoadingOlder: false
+        }
+      }));
+
+      return { loaded: formattedMessages.length };
+    } catch (error) {
+      setMessagePaging(prev => ({
+        ...prev,
+        [roomId]: {
+          ...prev[roomId],
+          isLoadingOlder: false
+        }
+      }));
+      throw error;
+    }
+  };
+
   const togglePin = async (roomId: string) => {
     try {
       setConversations(prev => prev.map(c => 
@@ -1049,8 +1118,10 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     users,
     conversations,
     messages,
+    messagePaging,
     sendMessage,
     sendFileMessage: sendFileMessageWithPreview,
+    loadOlderMessages,
     createGroupChat,
     createRoom,
     togglePin,

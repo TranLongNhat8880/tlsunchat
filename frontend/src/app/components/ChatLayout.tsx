@@ -97,6 +97,7 @@ export function ChatLayout({
   const [recallConfirm, setRecallConfirm] = useState<{ messages: Message[], label: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -111,8 +112,10 @@ export function ChatLayout({
     users,
     conversations,
     messages,
+    messagePaging,
     sendMessage,
     sendFileMessage,
+    loadOlderMessages,
     createGroupChat,
     createRoom,
     togglePin,
@@ -573,6 +576,27 @@ export function ChatLayout({
     }
   };
 
+  const handleMessagesScroll = async () => {
+    if (!selectedConvId) return;
+    const container = messagesScrollRef.current;
+    const paging = messagePaging[selectedConvId];
+    if (!container || !paging?.hasMore || paging.isLoadingOlder || container.scrollTop > 80) return;
+
+    const previousScrollHeight = container.scrollHeight;
+    try {
+      const result = await loadOlderMessages(selectedConvId);
+      if (result.loaded > 0) {
+        window.requestAnimationFrame(() => {
+          const nextContainer = messagesScrollRef.current;
+          if (!nextContainer) return;
+          nextContainer.scrollTop = nextContainer.scrollHeight - previousScrollHeight + nextContainer.scrollTop;
+        });
+      }
+    } catch (error) {
+      console.error('Không thể tải tin nhắn cũ:', error);
+    }
+  };
+
   const handleSendComposer = async () => {
     if (!selectedConvId || isUploading) return;
 
@@ -618,6 +642,10 @@ export function ChatLayout({
 
     if (convMessages.length > 0) {
       const isNewRoom = lastScrolledRoomRef.current !== selectedConvId;
+      const scrollContainer = messagesScrollRef.current;
+      const isNearBottom = !scrollContainer
+        || scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 160;
+      if (!isNewRoom && !isNearBottom) return;
       const scrollBehavior = isNewRoom ? 'auto' : 'smooth';
       
       const timer = setTimeout(() => {
@@ -1138,7 +1166,21 @@ export function ChatLayout({
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-3 bg-gray-50">
+          <div
+            ref={messagesScrollRef}
+            onScroll={handleMessagesScroll}
+            className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-3 bg-gray-50"
+          >
+            {selectedConvId && messagePaging[selectedConvId]?.isLoadingOlder && (
+              <div className="text-center text-gray-400" style={{ fontSize: '0.72rem' }}>
+                Đang tải tin nhắn cũ...
+              </div>
+            )}
+            {selectedConvId && messagePaging[selectedConvId] && !messagePaging[selectedConvId].hasMore && convMessages.length > 0 && (
+              <div className="text-center text-gray-300" style={{ fontSize: '0.7rem' }}>
+                Đã tải hết tin nhắn
+              </div>
+            )}
             {/* Date separator */}
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-gray-200" />

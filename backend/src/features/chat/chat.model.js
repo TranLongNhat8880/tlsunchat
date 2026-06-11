@@ -65,8 +65,8 @@ exports.removeRoomMember = async (roomId, userId) => {
   if (error) throw new Error(error.message);
 };
 
-exports.findMessagesByRoomId = async (roomId, limit = 50) => {
-  const { data, error } = await supabase
+exports.findMessagesByRoomId = async (roomId, limit = 50, before = null) => {
+  let query = supabase
     .from('messages')
     .select(`
       *,
@@ -75,8 +75,13 @@ exports.findMessagesByRoomId = async (roomId, limit = 50) => {
       reply_to:messages!reply_to_id (id, content, type, users(id, name))
     `)
     .eq('room_id', roomId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .order('created_at', { ascending: false });
+
+  if (before) {
+    query = query.lt('created_at', before);
+  }
+
+  const { data, error } = await query.limit(limit);
 
   if (error) throw new Error(error.message);
   return data;

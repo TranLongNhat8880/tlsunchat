@@ -19,15 +19,25 @@ exports.getMyRooms = async (userId) => {
   }
 };
 
-exports.getRoomMessages = async (roomId, userId) => {
+exports.getRoomMessages = async (roomId, userId, options = {}) => {
   const member = await chatModel.checkRoomMembership(roomId, userId);
   if (!member) {
     throw new AppError('Bạn không có quyền xem tin nhắn phòng này', 403);
   }
 
   try {
-    const messages = await chatModel.findMessagesByRoomId(roomId, 50);
-    return messages.reverse();
+    const limit = Math.min(Math.max(parseInt(options.limit, 10) || 50, 1), 100);
+    const rows = await chatModel.findMessagesByRoomId(roomId, limit + 1, options.before || null);
+    const hasMore = rows.length > limit;
+    const messages = rows.slice(0, limit).reverse();
+    return {
+      messages,
+      pagination: {
+        limit,
+        hasMore,
+        oldestCursor: messages[0]?.created_at || null
+      }
+    };
   } catch (error) {
     throw new AppError('Không thể tải lịch sử tin nhắn', 500);
   }
