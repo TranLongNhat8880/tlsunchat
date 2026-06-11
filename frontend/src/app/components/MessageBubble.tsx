@@ -19,6 +19,7 @@ interface MessageBubbleProps {
   onRecall: (m: Message, group?: Message[]) => void;
   onOpenImage: (m: Message, group?: Message[]) => void;
   onLinkClick: (url: string) => void;
+  onQuoteClick?: (m: Message) => void;
 }
 
 export function MessageBubble({
@@ -34,6 +35,7 @@ export function MessageBubble({
   onRecall,
   onOpenImage,
   onLinkClick,
+  onQuoteClick,
 }: MessageBubbleProps) {
   const [showActions, setShowActions] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -136,7 +138,8 @@ export function MessageBubble({
           {/* Reply quote */}
           {replyMsg && replyPreview && (
             <div
-              className={`px-2.5 py-1.5 rounded-xl border-l-2 border-green-400 mb-0.5 max-w-full overflow-hidden ${isMine ? 'bg-green-400/20' : 'bg-gray-100'
+              onClick={() => onQuoteClick?.(replyMsg)}
+              className={`px-2.5 py-1.5 rounded-xl border-l-2 border-green-400 mb-0.5 max-w-full overflow-hidden cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-green-400/20' : 'bg-gray-100'
                 }`}
             >
               <span

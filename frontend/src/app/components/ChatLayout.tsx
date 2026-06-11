@@ -1287,6 +1287,7 @@ export function ChatLayout({
                     onRecall={handleRecallMessage}
                     onOpenImage={openImageViewer}
                     onLinkClick={setPendingExternalLink}
+                    onQuoteClick={(m) => scrollToMessage(m.id)}
                   />
                 </div>
               );
