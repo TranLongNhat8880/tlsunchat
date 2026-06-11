@@ -1,14 +1,16 @@
 import React from 'react';
-import { ImageIcon, FileText, X, Link as LinkIcon } from 'lucide-react';
-import type { Message, User } from '../../types';
+import { ImageIcon, FileText, X, Link as LinkIcon, Users } from 'lucide-react';
+import type { Conversation, Message, User } from '../../types';
+import { Avatar, STATUS_LABEL } from './Avatar';
 import { downloadAttachment, extractMessageLinks } from '../../utils/chatHelpers';
 
-export type MediaTab = 'images' | 'files' | 'links';
+export type MediaTab = 'members' | 'images' | 'files' | 'links';
 
 interface MediaFilterPanelProps {
   tab: MediaTab;
   onTabChange: (t: MediaTab) => void;
   onClose: () => void;
+  conversation: Conversation;
   messages: Message[];
   users: User[];
   onOpenImage: (message: Message, group?: Message[]) => void;
@@ -19,17 +21,22 @@ export function MediaFilterPanel({
   tab,
   onTabChange,
   onClose,
+  conversation,
   messages,
   users,
   onOpenImage,
   onLinkClick,
 }: MediaFilterPanelProps) {
   const tabs: { key: MediaTab; label: string; icon: React.ReactNode }[] = [
+    { key: 'members', label: 'Thành viên', icon: <Users className="w-4 h-4" /> },
     { key: 'images', label: 'Hình ảnh', icon: <ImageIcon className="w-4 h-4" /> },
     { key: 'files', label: 'Tệp tin', icon: <FileText className="w-4 h-4" /> },
     { key: 'links', label: 'Liên kết', icon: <LinkIcon className="w-4 h-4" /> },
   ];
   const imageMessages = messages.filter(m => m.type === 'image' && m.fileUrl);
+  const memberUsers = conversation.participants
+    .map(id => users.find(user => user.id === id))
+    .filter((user): user is User => Boolean(user));
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -47,12 +54,12 @@ export function MediaFilterPanel({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-100 px-2">
+      <div className="flex overflow-x-auto border-b border-gray-100 px-2">
         {tabs.map(t => (
           <button
             key={t.key}
             onClick={() => onTabChange(t.key)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 border-b-2 transition-colors ${tab === t.key
+            className={`flex-none min-w-[86px] flex items-center justify-center gap-1.5 py-2.5 border-b-2 transition-colors ${tab === t.key
               ? 'border-green-500 text-green-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
@@ -66,6 +73,36 @@ export function MediaFilterPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3">
+        {tab === 'members' && (
+          <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <span className="text-gray-800" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                Thành viên ({memberUsers.length})
+              </span>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm divide-y divide-gray-50/80 overflow-hidden">
+              {memberUsers.map(member => (
+                <div key={member.id} className="flex items-center gap-3 p-3">
+                  <Avatar user={member} size="md" showStatus />
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-gray-800" style={{ fontSize: '0.86rem', fontWeight: 600 }}>
+                      {member.name}
+                    </p>
+                    <p className="truncate text-gray-400" style={{ fontSize: '0.74rem' }}>
+                      {member.email} · {STATUS_LABEL[member.status]}
+                    </p>
+                  </div>
+                  {member.role === 'admin' && (
+                    <span className="rounded-full bg-green-50 px-2 py-0.5 text-green-600" style={{ fontSize: '0.65rem', fontWeight: 700 }}>
+                      ADMIN
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {tab === 'images' && (
           <div className="grid grid-cols-3 gap-1.5">
             {imageMessages.map(img => (

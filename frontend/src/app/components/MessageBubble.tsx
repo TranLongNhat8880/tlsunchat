@@ -89,6 +89,19 @@ export function MessageBubble({
     if (touchTimer.current) window.clearTimeout(touchTimer.current);
   };
 
+  if (msg.type === 'system') {
+    return (
+      <div className="flex justify-center px-3 py-1.5">
+        <span
+          className="max-w-[85%] rounded-full bg-gray-100 px-3 py-1 text-center text-gray-500 shadow-sm"
+          style={{ fontSize: '0.76rem', lineHeight: '1.35' }}
+        >
+          {msg.content}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <>
       <div

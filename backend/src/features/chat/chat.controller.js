@@ -46,8 +46,28 @@ exports.createRoom = catchAsync(async (req, res, next) => {
 
   // Phát tín hiệu Socket cho tất cả thành viên (bao gồm người tạo)
   const { getIo } = require('../../websockets/socket.manager');
-  const allMembers = [req.user.id, ...memberIds];
-  getIo().to(allMembers).emit('group_created', result.room);
+  const io = getIo();
+  const allMembers = Array.from(new Set([req.user.id, ...memberIds]));
+  let systemMessage = null;
+
+  if (result.room.type === 'group') {
+    systemMessage = await chatModel.saveMessage({
+      room_id: result.room.id,
+      sender_id: req.user.id,
+      type: 'system',
+      content: `${req.user.name} đã tạo nhóm`
+    });
+  }
+
+  io.to(allMembers).emit('group_created', result.room);
+  io.to(allMembers).emit('room_members_updated', {
+    roomId: result.room.id,
+    participants: allMembers,
+    memberCount: allMembers.length
+  });
+  if (systemMessage) {
+    io.to(allMembers).emit('receive_message', systemMessage);
+  }
 
   res.status(201).json({
     status: 'success',
@@ -69,7 +89,26 @@ exports.leaveRoom = catchAsync(async (req, res, next) => {
   const result = await chatService.leaveRoom(req.params.roomId, req.user.id);
 
   const { getIo } = require('../../websockets/socket.manager');
-  getIo().to(req.user.id).emit('room_left', { roomId: req.params.roomId });
+  const io = getIo();
+  const remainingMemberIds = result.remainingMemberIds || [];
+
+  io.to(req.user.id).emit('room_left', { roomId: req.params.roomId });
+
+  if (result.type === 'group' && result.memberCount > 0) {
+    const systemMessage = await chatModel.saveMessage({
+      room_id: req.params.roomId,
+      sender_id: req.user.id,
+      type: 'system',
+      content: `${req.user.name} đã rời nhóm`
+    });
+
+    io.to(remainingMemberIds).emit('room_members_updated', {
+      roomId: req.params.roomId,
+      participants: remainingMemberIds,
+      memberCount: result.memberCount
+    });
+    io.to(remainingMemberIds).emit('receive_message', systemMessage);
+  }
 
   res.status(200).json({
     status: 'success',

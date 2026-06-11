@@ -604,6 +604,14 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       });
     });
 
+    socketRef.current.on('room_members_updated', (data: { roomId: string; participants: string[] }) => {
+      setConversations(prev => prev.map(conversation => (
+        conversation.id === data.roomId
+          ? { ...conversation, participants: data.participants }
+          : conversation
+      )));
+    });
+
     socketRef.current.on('group_created', (newRoom: any) => {
       // Khi có nhóm mới tạo, fetch lại danh sách nhóm
       api.get('/chat/rooms').then(res => {
@@ -668,6 +676,8 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       socketRef.current?.off('message_reacted');
       socketRef.current?.off('message_recalled');
       socketRef.current?.off('room_left');
+      socketRef.current?.off('room_members_updated');
+      socketRef.current?.off('group_created');
       socketRef.current?.off('presence_snapshot');
       socketRef.current?.off('presence_update');
       socketRef.current?.disconnect();

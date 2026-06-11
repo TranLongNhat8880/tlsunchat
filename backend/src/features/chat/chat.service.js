@@ -107,9 +107,21 @@ exports.leaveRoom = async (roomId, userId) => {
     const memberCount = await chatModel.countRoomMembers(roomId);
     if (memberCount === 0) {
       await chatModel.deleteRoom(roomId);
+      return {
+        roomId,
+        type: room.type,
+        memberCount,
+        remainingMemberIds: []
+      };
     }
 
-    return { roomId, type: room.type };
+    const remainingMembers = await chatModel.getRoomMemberIds(roomId);
+    return {
+      roomId,
+      type: room.type,
+      memberCount,
+      remainingMemberIds: remainingMembers.map(member => member.user_id)
+    };
   } catch (error) {
     throw new AppError('Khong the cap nhat cuoc tro chuyen', 500);
   }

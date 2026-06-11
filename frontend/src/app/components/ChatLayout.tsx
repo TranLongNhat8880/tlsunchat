@@ -74,7 +74,7 @@ export function ChatLayout({
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showInfo, setShowInfo] = useState(false);
-  const [mediaTab, setMediaTab] = useState<MediaTab>('images');
+  const [mediaTab, setMediaTab] = useState<MediaTab>('members');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showRoomMenu, setShowRoomMenu] = useState(false);
@@ -1457,6 +1457,7 @@ export function ChatLayout({
               tab={mediaTab}
               onTabChange={setMediaTab}
               onClose={() => setShowInfo(false)}
+              conversation={selectedConv}
               messages={convMessages}
               users={users}
               onOpenImage={openImageViewer}
