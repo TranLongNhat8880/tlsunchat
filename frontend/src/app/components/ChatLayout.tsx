@@ -1452,7 +1452,7 @@ export function ChatLayout({
 
         {/* Media filter panel */}
         {showInfo && (
-          <div className="w-full sm:w-72 flex-shrink-0 border-l border-gray-100">
+          <div className="w-full sm:w-[350px] flex-shrink-0 border-l border-gray-100">
             <MediaFilterPanel
               tab={mediaTab}
               onTabChange={setMediaTab}

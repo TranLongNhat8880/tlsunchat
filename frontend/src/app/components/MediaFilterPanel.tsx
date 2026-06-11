@@ -27,12 +27,21 @@ export function MediaFilterPanel({
   onOpenImage,
   onLinkClick,
 }: MediaFilterPanelProps) {
-  const tabs: { key: MediaTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'members', label: 'Thành viên', icon: <Users className="w-4 h-4" /> },
+  const tabs: { key: MediaTab; label: string; icon: React.ReactNode }[] = [];
+  if (conversation.type === 'group') {
+    tabs.push({ key: 'members', label: 'Thành viên', icon: <Users className="w-4 h-4" /> });
+  }
+  tabs.push(
     { key: 'images', label: 'Hình ảnh', icon: <ImageIcon className="w-4 h-4" /> },
     { key: 'files', label: 'Tệp tin', icon: <FileText className="w-4 h-4" /> },
-    { key: 'links', label: 'Liên kết', icon: <LinkIcon className="w-4 h-4" /> },
-  ];
+    { key: 'links', label: 'Liên kết', icon: <LinkIcon className="w-4 h-4" /> }
+  );
+
+  React.useEffect(() => {
+    if (conversation.type !== 'group' && tab === 'members') {
+      onTabChange('images');
+    }
+  }, [conversation.type, tab, onTabChange]);
   const imageMessages = messages.filter(m => m.type === 'image' && m.fileUrl);
   const memberUsers = conversation.participants
     .map(id => users.find(user => user.id === id))
