@@ -644,11 +644,15 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
             const confirmedMessage = formatMessageFromApi(response.message, 'sent');
             setMessages(prev => {
               const roomMsgs = prev[roomId] || [];
-              const withoutTemp = roomMsgs.filter(message => message.id !== tempId);
-              const hasConfirmed = withoutTemp.some(message => message.id === confirmedMessage.id);
+              const withoutConfirmedDuplicate = roomMsgs.filter(message => message.id !== confirmedMessage.id);
+              const hasTemp = withoutConfirmedDuplicate.some(message => message.id === tempId);
               return {
                 ...prev,
-                [roomId]: hasConfirmed ? withoutTemp : [...withoutTemp, confirmedMessage]
+                [roomId]: hasTemp
+                  ? withoutConfirmedDuplicate.map(message => (
+                      message.id === tempId ? confirmedMessage : message
+                    ))
+                  : [...withoutConfirmedDuplicate, confirmedMessage]
               };
             });
           }
