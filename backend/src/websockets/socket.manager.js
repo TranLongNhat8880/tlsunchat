@@ -117,6 +117,10 @@ const init = (server) => {
 
     socket.on('send_message', async (data, callback) => {
       const { roomId, content, type = 'text', replyToId = null } = data;
+      const rawClientMessageId = typeof data.clientMessageId === 'string' ? data.clientMessageId.trim() : '';
+      const clientMessageId = rawClientMessageId.length > 0 && rawClientMessageId.length <= 128
+        ? rawClientMessageId
+        : null;
       const senderId = socket.user.id;
 
       try {
@@ -129,12 +133,15 @@ const init = (server) => {
           sender_id: senderId,
           content,
           type,
-          reply_to_id: replyToId
+          reply_to_id: replyToId,
+          client_message_id: clientMessageId
         });
+        const alreadyExisted = Boolean(newMessage._alreadyExisted);
+        delete newMessage._alreadyExisted;
 
         const members = await chatModel.getRoomMemberIds(roomId);
 
-        if (members) {
+        if (members && !alreadyExisted) {
           members.forEach((member) => {
             io.to(member.user_id).emit('receive_message', newMessage);
           });

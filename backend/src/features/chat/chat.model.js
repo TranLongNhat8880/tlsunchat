@@ -1,5 +1,14 @@
 const supabase = require('../../config/database');
 
+const MESSAGE_SELECT = '*, users(id, name, avatar), reply_to:messages!reply_to_id(id, content, type, users(id, name))';
+
+const isMissingClientMessageIdError = (error) => (
+  error?.code === '42703'
+  || error?.code === 'PGRST204'
+  || String(error?.message || '').includes('client_message_id')
+  || String(error?.details || '').includes('client_message_id')
+);
+
 exports.findRoomsByUserId = async (userId) => {
   const { data, error } = await supabase
     .from('room_members')
@@ -149,13 +158,67 @@ exports.updateRoomPinStatus = async (roomId, userId, isPinned) => {
 };
 
 exports.saveMessage = async (messageData) => {
+  const clientMessageId = messageData.client_message_id;
+  let insertData = messageData;
+
+  if (clientMessageId) {
+    try {
+      const existing = await exports.findMessageByClientMessageId(
+        messageData.room_id,
+        messageData.sender_id,
+        clientMessageId
+      );
+      if (existing) return { ...existing, _alreadyExisted: true };
+    } catch (error) {
+      if (!isMissingClientMessageIdError(error)) throw error;
+      insertData = { ...messageData };
+      delete insertData.client_message_id;
+    }
+  }
+
   const { data, error } = await supabase
     .from('messages')
-    .insert([messageData])
-    .select('*, users(id, name, avatar), reply_to:messages!reply_to_id(id, content, type, users(id, name))')
+    .insert([insertData])
+    .select(MESSAGE_SELECT)
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (clientMessageId && error.code === '23505') {
+      const existing = await exports.findMessageByClientMessageId(
+        messageData.room_id,
+        messageData.sender_id,
+        clientMessageId
+      );
+      if (existing) return { ...existing, _alreadyExisted: true };
+    }
+
+    if (clientMessageId && isMissingClientMessageIdError(error)) {
+      const retryData = { ...messageData };
+      delete retryData.client_message_id;
+      const retry = await supabase
+        .from('messages')
+        .insert([retryData])
+        .select(MESSAGE_SELECT)
+        .single();
+      if (retry.error) throw new Error(retry.error.message);
+      return retry.data;
+    }
+
+    throw new Error(error.message);
+  }
+  return data;
+};
+
+exports.findMessageByClientMessageId = async (roomId, senderId, clientMessageId) => {
+  const { data, error } = await supabase
+    .from('messages')
+    .select(MESSAGE_SELECT)
+    .eq('room_id', roomId)
+    .eq('sender_id', senderId)
+    .eq('client_message_id', clientMessageId)
+    .maybeSingle();
+
+  if (error) throw error;
   return data;
 };
 

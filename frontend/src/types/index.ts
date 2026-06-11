@@ -36,6 +36,7 @@ export interface Message {
   type: MessageType;
   timestamp: string;
   createdAt?: string;
+  clientMessageId?: string;
   status: MessageStatus;
   reactions?: { emoji: string; userIds: string[] }[];
   replyToId?: string;

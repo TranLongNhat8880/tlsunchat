@@ -59,6 +59,45 @@ const uploadWithProgress = (
 const notificationAudio = new Audio('/notnew.mp3');
 const MESSAGE_PAGE_SIZE = 50;
 
+type PendingOutboxMessage = {
+  clientMessageId: string;
+  roomId: string;
+  content: string;
+  replyToId?: string | null;
+  createdAt: string;
+  status: 'pending' | 'failed';
+};
+
+const getOutboxKey = (userId: string) => `tlsunchat_outbox_${userId}`;
+
+const createClientMessageId = () => {
+  if ('crypto' in window && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const readStoredOutbox = (userId: string): PendingOutboxMessage[] => {
+  try {
+    const raw = localStorage.getItem(getOutboxKey(userId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn('Failed to read outbox:', error);
+    return [];
+  }
+};
+
+const writeStoredOutbox = (userId: string, items: PendingOutboxMessage[]) => {
+  try {
+    localStorage.setItem(getOutboxKey(userId), JSON.stringify(items.slice(-100)));
+  } catch (error) {
+    console.warn('Failed to persist outbox:', error);
+  }
+};
+
+const getTempMessageId = (clientMessageId: string) => `temp-text-${clientMessageId}`;
+
 const showForegroundNotification = (options: {
   title: string;
   body: string;
@@ -118,6 +157,7 @@ const formatMessageFromApi = (m: any, status: Message['status'] = 'sent'): Messa
     type: m.type,
     timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     createdAt: m.created_at,
+    clientMessageId: m.client_message_id,
     status,
     fileId: file?.id,
     fileName: file?.original_name,
@@ -194,6 +234,8 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     isLoadingOlder: boolean;
   }>>({});
   const socketRef = useRef<Socket | null>(null);
+  const outboxRef = useRef<PendingOutboxMessage[]>([]);
+  const isFlushingOutboxRef = useRef(false);
 
   const formatRoomFromApi = (r: any, selectedId: string | null): Conversation => {
     const room = r.rooms;
@@ -257,6 +299,79 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     usersRef.current = users;
   }, [users]);
 
+  const persistOutbox = (items: PendingOutboxMessage[]) => {
+    outboxRef.current = items;
+    if (currentUser?.id) {
+      writeStoredOutbox(currentUser.id, items);
+    }
+  };
+
+  const upsertOutboxMessage = (item: PendingOutboxMessage) => {
+    const withoutCurrent = outboxRef.current.filter(message => message.clientMessageId !== item.clientMessageId);
+    persistOutbox([...withoutCurrent, item]);
+  };
+
+  const removeOutboxMessage = (clientMessageId?: string | null) => {
+    if (!clientMessageId) return;
+    persistOutbox(outboxRef.current.filter(message => message.clientMessageId !== clientMessageId));
+  };
+
+  const markOutboxMessageFailed = (clientMessageId: string) => {
+    persistOutbox(outboxRef.current.map(message => (
+      message.clientMessageId === clientMessageId
+        ? { ...message, status: 'failed' }
+        : message
+    )));
+  };
+
+  const patchQueuedMessage = (clientMessageId: string, patch: Partial<Message>) => {
+    const tempId = getTempMessageId(clientMessageId);
+    setMessages(prev => {
+      const next = { ...prev };
+      for (const roomId in next) {
+        next[roomId] = next[roomId].map(message => (
+          message.id === tempId ? { ...message, ...patch } : message
+        ));
+      }
+      return next;
+    });
+  };
+
+  const buildPendingMessage = (item: PendingOutboxMessage): Message => ({
+    id: getTempMessageId(item.clientMessageId),
+    conversationId: item.roomId,
+    senderId: currentUser?.id || '',
+    content: item.content,
+    type: 'text',
+    timestamp: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdAt: item.createdAt,
+    clientMessageId: item.clientMessageId,
+    status: 'sent',
+    isUploading: item.status === 'pending',
+    uploadError: item.status === 'failed' ? 'Chưa gửi' : undefined,
+    replyToId: item.replyToId || undefined
+  });
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const storedOutbox = readStoredOutbox(currentUser.id);
+    outboxRef.current = storedOutbox;
+    if (storedOutbox.length === 0) return;
+
+    setMessages(prev => {
+      const next = { ...prev };
+      storedOutbox.forEach(item => {
+        const roomMessages = next[item.roomId] || [];
+        const tempId = getTempMessageId(item.clientMessageId);
+        if (roomMessages.some(message => message.id === tempId || message.clientMessageId === item.clientMessageId)) {
+          return;
+        }
+        next[item.roomId] = [...roomMessages, buildPendingMessage(item)];
+      });
+      return next;
+    });
+  }, [currentUser?.id]);
+
   // 1. Khởi tạo Socket.io và tải danh sách ban đầu
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -282,6 +397,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
 
     socketRef.current.on('connect', () => {
       console.log('Đã kết nối Socket.io');
+      flushOutbox();
     });
 
     socketRef.current.on('presence_snapshot', (data: { onlineUserIds: string[] }) => {
@@ -313,6 +429,14 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
         const roomMsgs = prev[newMsg.conversationId] || [];
         // Lọc trùng lặp id nếu socket bị gọi 2 lần do mạng
         if (roomMsgs.some(m => m.id === newMsg.id)) return prev;
+        const pendingTempId = newMsg.clientMessageId ? getTempMessageId(newMsg.clientMessageId) : null;
+        if (pendingTempId && roomMsgs.some(m => m.id === pendingTempId)) {
+          removeOutboxMessage(newMsg.clientMessageId);
+          return {
+            ...prev,
+            [newMsg.conversationId]: roomMsgs.map(m => m.id === pendingTempId ? newMsg : m)
+          };
+        }
         
         // 🔔 Hiển thị thông báo & Phát âm thanh
         if (currentUser && newMsg.senderId !== currentUser.id) {
@@ -532,8 +656,10 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
       }));
     });
 
+    window.addEventListener('online', flushOutbox);
 
     return () => {
+      window.removeEventListener('online', flushOutbox);
       socketRef.current?.off('receive_message');
       socketRef.current?.off('user_updated');
       socketRef.current?.off('update_message');
@@ -564,10 +690,17 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
     api.get(`/chat/rooms/${selectedConvId}/messages?limit=${MESSAGE_PAGE_SIZE}`).then(res => {
       const rawMsgs = res.data.data.messages;
       const formattedMsgs: Message[] = rawMsgs.map((m: any) => formatMessageFromApi(m, 'seen'));
+      const confirmedClientIds = new Set(formattedMsgs.map(m => m.clientMessageId).filter(Boolean));
+      if (confirmedClientIds.size > 0) {
+        persistOutbox(outboxRef.current.filter(item => !confirmedClientIds.has(item.clientMessageId)));
+      }
+      const pendingForRoom = outboxRef.current
+        .filter(item => item.roomId === selectedConvId && !confirmedClientIds.has(item.clientMessageId))
+        .map(buildPendingMessage);
 
       setMessages(prev => ({
         ...prev,
-        [selectedConvId]: formattedMsgs
+        [selectedConvId]: [...formattedMsgs, ...pendingForRoom]
       }));
       setMessagePaging(prev => ({
         ...prev,
@@ -605,15 +738,115 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
   }, [selectedConvId, currentUser?.id]);
 
   // 3. Hàm gửi tin nhắn
+  const confirmQueuedMessage = (pending: PendingOutboxMessage, rawMessage: any) => {
+    const confirmedMessage = formatMessageFromApi(rawMessage, 'sent');
+    removeOutboxMessage(pending.clientMessageId);
+    setMessages(prev => {
+      const roomMsgs = prev[pending.roomId] || [];
+      const tempId = getTempMessageId(pending.clientMessageId);
+      const withoutConfirmedDuplicate = roomMsgs.filter(message => message.id !== confirmedMessage.id);
+      const hasTemp = withoutConfirmedDuplicate.some(message => message.id === tempId);
+      return {
+        ...prev,
+        [pending.roomId]: hasTemp
+          ? withoutConfirmedDuplicate.map(message => (
+              message.id === tempId ? confirmedMessage : message
+            ))
+          : [...withoutConfirmedDuplicate, confirmedMessage]
+      };
+    });
+    return confirmedMessage;
+  };
+
+  const emitQueuedTextMessage = (pending: PendingOutboxMessage) => new Promise<Message>((resolve, reject) => {
+    if (!socketRef.current?.connected) {
+      markOutboxMessageFailed(pending.clientMessageId);
+      patchQueuedMessage(pending.clientMessageId, {
+        isUploading: false,
+        uploadError: 'Chưa gửi'
+      });
+      reject(new Error('Mất kết nối máy chủ'));
+      return;
+    }
+
+    upsertOutboxMessage({ ...pending, status: 'pending' });
+    patchQueuedMessage(pending.clientMessageId, {
+      isUploading: true,
+      uploadError: undefined
+    });
+
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      markOutboxMessageFailed(pending.clientMessageId);
+      patchQueuedMessage(pending.clientMessageId, {
+        isUploading: false,
+        uploadError: 'Chưa gửi'
+      });
+      reject(new Error('Gửi tin nhắn quá lâu, sẽ thử lại khi có mạng'));
+    }, 12000);
+
+    socketRef.current.emit('send_message', {
+      roomId: pending.roomId,
+      content: pending.content,
+      type: 'text',
+      replyToId: pending.replyToId || null,
+      clientMessageId: pending.clientMessageId
+    }, (response: any) => {
+      if (settled) {
+        if (response?.status === 'success') {
+          confirmQueuedMessage(pending, response.message);
+        }
+        return;
+      }
+      settled = true;
+      window.clearTimeout(timeoutId);
+
+      if (response?.status === 'success') {
+        resolve(confirmQueuedMessage(pending, response.message));
+        return;
+      }
+
+      markOutboxMessageFailed(pending.clientMessageId);
+      patchQueuedMessage(pending.clientMessageId, {
+        isUploading: false,
+        uploadError: response?.error || 'Chưa gửi'
+      });
+      reject(new Error(response?.error || 'Lỗi gửi tin nhắn'));
+    });
+  });
+
+  const flushOutbox = async () => {
+    if (isFlushingOutboxRef.current || !socketRef.current?.connected) return;
+    isFlushingOutboxRef.current = true;
+    try {
+      for (const pending of outboxRef.current) {
+        await emitQueuedTextMessage(pending).catch(() => undefined);
+      }
+    } finally {
+      isFlushingOutboxRef.current = false;
+    }
+  };
+
   const sendMessage = (roomId: string, content: string, type: 'text' | 'file' | 'image' | 'video' = 'text', replyToId: string | null = null) => {
     return new Promise<Message>((resolve, reject) => {
       const isOptimisticText = type === 'text';
-      const tempId = `temp-text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      if (!socketRef.current) return reject(new Error('Mất kết nối máy chủ'));
+      const clientMessageId = createClientMessageId();
+      const tempId = getTempMessageId(clientMessageId);
+      if (!socketRef.current && !isOptimisticText) return reject(new Error('Mất kết nối máy chủ'));
       if (!currentUser) return reject(new Error('Chưa đăng nhập'));
       
       if (isOptimisticText) {
         const createdAt = new Date().toISOString();
+        const pending: PendingOutboxMessage = {
+          clientMessageId,
+          roomId,
+          content,
+          replyToId,
+          createdAt,
+          status: 'pending'
+        };
         const timestamp = new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const replySource = replyToId ? (messages[roomId] || []).find(message => message.id === replyToId) : undefined;
         const optimisticMessage: Message = {
@@ -624,6 +857,7 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
           type: 'text',
           timestamp,
           createdAt,
+          clientMessageId,
           status: 'sent',
           isUploading: true,
           replyToId: replyToId || undefined,
@@ -653,6 +887,10 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
               }
             : conversation
         )));
+
+        upsertOutboxMessage(pending);
+        emitQueuedTextMessage(pending).then(resolve).catch(reject);
+        return;
       }
 
       socketRef.current?.emit('send_message', {
