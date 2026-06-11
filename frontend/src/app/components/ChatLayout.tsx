@@ -276,6 +276,31 @@ export function ChatLayout({
     if (!message) return '';
     return message.createdAt ? message.createdAt.slice(0, 16) : message.timestamp;
   };
+  const getMessageDateKey = (message?: Message | null) => {
+    if (!message?.createdAt) return '';
+    const date = new Date(message.createdAt);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-CA');
+  };
+  const formatMessageDateLabel = (message: Message) => {
+    if (!message.createdAt) return 'Tin nhắn';
+    const date = new Date(message.createdAt);
+    if (Number.isNaN(date.getTime())) return 'Tin nhắn';
+
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    const key = date.toLocaleDateString('en-CA');
+    if (key === today.toLocaleDateString('en-CA')) return 'Hôm nay';
+    if (key === yesterday.toLocaleDateString('en-CA')) return 'Hôm qua';
+
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
   const isSameMessageBatch = (a?: Message | null, b?: Message | null) => Boolean(
     a
     && b
@@ -1181,15 +1206,6 @@ export function ChatLayout({
                 Đã tải hết tin nhắn
               </div>
             )}
-            {/* Date separator */}
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-gray-400 flex-shrink-0" style={{ fontSize: '0.72rem' }}>
-                Hôm nay
-              </span>
-              <div className="flex-1 h-px bg-gray-200" />
-            </div>
-
             {convMessages.map((msg, idx) => {
               const isMine = msg.senderId === currentUser.id;
               const sender = users.find(u => u.id === msg.senderId);
@@ -1222,8 +1238,7 @@ export function ChatLayout({
                 : undefined;
 
               const prevMsg = idx > 0 ? convMessages[idx - 1] : null;
-              const showDateSep =
-                idx > 0 && prevMsg && msg.senderId !== prevMsg.senderId && idx === 4;
+              const showDateSep = idx === 0 || getMessageDateKey(msg) !== getMessageDateKey(prevMsg);
               const isActiveSearchMatch = activeSearchMatch?.id === msg.id;
 
               return (
@@ -1238,7 +1253,7 @@ export function ChatLayout({
                     <div className="flex items-center gap-2 my-2">
                       <div className="flex-1 h-px bg-gray-200" />
                       <span className="text-gray-400" style={{ fontSize: '0.72rem' }}>
-                        08:30
+                        {formatMessageDateLabel(msg)}
                       </span>
                       <div className="flex-1 h-px bg-gray-200" />
                     </div>
