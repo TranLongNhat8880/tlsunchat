@@ -136,7 +136,7 @@ export function MessageBubble({
           )}
 
           {/* Reply quote */}
-          {replyMsg && replyPreview && (
+          {isMine && replyMsg && replyPreview && (
             <div
               onClick={() => onQuoteClick?.(replyMsg)}
               className={`px-2.5 py-1.5 rounded-xl border-l-2 border-green-400 mb-0.5 max-w-full overflow-hidden cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-green-400/20' : 'bg-gray-100'

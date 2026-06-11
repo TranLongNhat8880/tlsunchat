@@ -1240,6 +1240,7 @@ export function ChatLayout({
                   return convMessages.slice(idx, idx + groupIdx).every(prev => prev.type === 'image' && isSameMessageBatch(prev, msg));
                 })
                 : undefined;
+              const replyMsgRaw = msg.replyToId ? convMessages.find(m => m.id === msg.replyToId) : undefined;
               const replyMsg = msg.replyTo ? ({
                 id: msg.replyTo.id,
                 conversationId: msg.conversationId,
@@ -1249,8 +1250,8 @@ export function ChatLayout({
                 timestamp: '',
                 status: 'seen',
                 userName: msg.replyTo.userName
-              } as Message & { userName: string }) : msg.replyToId
-                ? convMessages.find(m => m.id === msg.replyToId)
+              } as Message & { userName: string }) : replyMsgRaw
+                ? { ...replyMsgRaw, userName: users.find(u => u.id === replyMsgRaw.senderId)?.name || 'Bạn' }
                 : undefined;
 
               const prevMsg = idx > 0 ? convMessages[idx - 1] : null;
