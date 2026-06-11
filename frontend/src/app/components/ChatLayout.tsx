@@ -353,12 +353,33 @@ export function ChatLayout({
   const getConvTitle = (conv: Conversation) =>
     conv.type === 'group' ? conv.name : getPartner(conv)?.name ?? conv.name;
 
-  const filteredConvs = conversations
+  const getConversationDedupeKey = (conv: Conversation) => {
+    if (conv.type !== 'dm') return conv.id;
+    const partnerId = conv.participants.find(userId => userId !== currentUser.id);
+    return partnerId ? `dm:${partnerId}` : conv.id;
+  };
+
+  const visibleConversations = Array.from(
+    conversations.reduce((acc, conv) => {
+      const key = getConversationDedupeKey(conv);
+      const existing = acc.get(key);
+      const shouldReplace = !existing
+        || conv.id === selectedConvId
+        || ((conv.updatedAt || 0) > (existing.updatedAt || 0) && existing.id !== selectedConvId);
+
+      if (shouldReplace) {
+        acc.set(key, conv);
+      }
+      return acc;
+    }, new Map<string, Conversation>()).values()
+  );
+
+  const filteredConvs = visibleConversations
     .filter(c => getConvTitle(c).toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
   const directChatUserIds = new Set(
-    conversations
+    visibleConversations
       .filter(c => c.type === 'dm')
       .flatMap(c => c.participants.filter(userId => userId !== currentUser.id))
   );
