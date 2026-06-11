@@ -192,14 +192,19 @@ export function ChatLayout({
       return;
     }
 
-    setIsUploading(true);
+    const hasAttachments = attachmentsToSend.length > 0;
+    if (hasAttachments) {
+      setIsUploading(true);
+    }
     try {
       const type = file.type.startsWith('image/') ? 'image' : 'file';
       await sendFileMessage(selectedConvId, file, type);
     } catch (error: any) {
       alert(error.message || 'Có lỗi xảy ra khi tải file lên');
     } finally {
-      setIsUploading(false);
+      if (hasAttachments) {
+        setIsUploading(false);
+      }
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -588,7 +593,12 @@ export function ChatLayout({
 
     try {
       if (text) {
-        await sendMessage(selectedConvId, text, 'text', replyTo?.id);
+        const sendText = sendMessage(selectedConvId, text, 'text', replyTo?.id);
+        if (hasAttachments) {
+          await sendText;
+        } else {
+          sendText.catch(error => console.error('Không thể gửi tin nhắn:', error));
+        }
       }
 
       await runWithConcurrency(attachmentsToSend, MAX_CONCURRENT_UPLOADS, async (item) => {

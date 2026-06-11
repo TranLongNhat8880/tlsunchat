@@ -44,6 +44,8 @@ export function MessageBubble({
   const displayFileName = msg.fileName || msg.content;
   const fileStyle = displayFileName ? getFileIcon(displayFileName) : null;
   const isRecalled = msg.content === '__MESSAGE_RECALLED__';
+  const isPendingText = msg.type === 'text' && msg.isUploading;
+  const isFailedText = msg.type === 'text' && Boolean(msg.uploadError);
   const groupedImages = imageGroup && imageGroup.length > 1 ? imageGroup : null;
   const replyAuthor = replyMsg ? ((replyMsg as any).userName || (replyMsg as any)._senderName || '') : '';
   const replyPreview = replyMsg
@@ -370,7 +372,7 @@ export function MessageBubble({
                 className={`px-3.5 py-2 rounded-2xl max-w-full overflow-hidden ${isMine
                   ? 'bg-green-500 text-white rounded-tr-sm'
                   : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-tl-sm'
-                  }`}
+                  } ${isPendingText ? 'opacity-80' : ''} ${isFailedText ? 'ring-1 ring-red-300' : ''}`}
               >
                 <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" style={{ fontSize: '0.9rem', lineHeight: '1.45' }}>
                   {renderMessageContent(msg.content, isMine, onLinkClick)}
@@ -402,9 +404,23 @@ export function MessageBubble({
             <span className="text-gray-400" style={{ fontSize: '0.68rem' }}>
               {msg.timestamp}
             </span>
+            {isMine && isPendingText && (
+              <span className="text-gray-400" style={{ fontSize: '0.68rem' }}>
+                Đang gửi
+              </span>
+            )}
+            {isMine && isFailedText && (
+              <span className="text-red-400" style={{ fontSize: '0.68rem' }}>
+                Gửi lỗi
+              </span>
+            )}
             {isMine && (
               <span>
-                {msg.status === 'seen' ? (
+                {isPendingText ? (
+                  <Check className="w-3.5 h-3.5 text-gray-300" />
+                ) : isFailedText ? (
+                  <X className="w-3.5 h-3.5 text-red-400" />
+                ) : msg.status === 'seen' ? (
                   <CheckCheck className="w-3.5 h-3.5 text-green-500" />
                 ) : msg.status === 'delivered' ? (
                   <CheckCheck className="w-3.5 h-3.5 text-gray-400" />
@@ -417,7 +433,7 @@ export function MessageBubble({
         </div>
 
         {/* Quick actions on hover */}
-        {!isRecalled && (
+        {!isRecalled && !msg.isUploading && !msg.uploadError && (
           <div
             className={`flex items-center gap-0.5 mb-3 transition-opacity ${showActions ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
               } ${isMine ? 'mr-1' : 'ml-1'}`}
@@ -473,7 +489,7 @@ export function MessageBubble({
       </div>
 
       {/* Mobile Action Menu (Bottom Sheet) */}
-      {showMobileMenu && (
+      {showMobileMenu && !msg.isUploading && !msg.uploadError && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
           <div className="absolute inset-0 bg-black/40 transition-opacity" onClick={() => setShowMobileMenu(false)} />
           <div className="bg-white rounded-t-2xl p-4 pb-6 flex flex-col gap-2 relative transform transition-transform duration-300">

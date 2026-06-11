@@ -585,8 +585,54 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
   // 3. Hàm gửi tin nhắn
   const sendMessage = (roomId: string, content: string, type: 'text' | 'file' | 'image' | 'video' = 'text', replyToId: string | null = null) => {
     return new Promise<Message>((resolve, reject) => {
+      const isOptimisticText = type === 'text';
+      const tempId = `temp-text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      if (!socketRef.current) return reject(new Error('Mất kết nối máy chủ'));
       if (!currentUser) return reject(new Error('Chưa đăng nhập'));
       
+      if (isOptimisticText) {
+        const createdAt = new Date().toISOString();
+        const timestamp = new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const replySource = replyToId ? (messages[roomId] || []).find(message => message.id === replyToId) : undefined;
+        const optimisticMessage: Message = {
+          id: tempId,
+          conversationId: roomId,
+          senderId: currentUser.id,
+          content,
+          type: 'text',
+          timestamp,
+          createdAt,
+          status: 'sent',
+          isUploading: true,
+          replyToId: replyToId || undefined,
+          replyTo: replySource ? {
+            id: replySource.id,
+            content: replySource.content,
+            type: replySource.type,
+            userName: replySource.senderId === currentUser.id
+              ? 'chính bạn'
+              : usersRef.current.find(user => user.id === replySource.senderId)?.name || ''
+          } : undefined
+        };
+
+        setMessages(prev => ({
+          ...prev,
+          [roomId]: [...(prev[roomId] || []), optimisticMessage]
+        }));
+
+        setConversations(prev => prev.map(conversation => (
+          conversation.id === roomId
+            ? {
+                ...conversation,
+                lastMessage: `Bạn: ${content}`,
+                lastTime: timestamp,
+                updatedAt: Date.now(),
+                unread: 0
+              }
+            : conversation
+        )));
+      }
+
       socketRef.current?.emit('send_message', {
         roomId,
         content,
@@ -594,10 +640,32 @@ export function useChat(currentUser: User | null, selectedConvId: string | null)
         replyToId
       }, (response: any) => {
         if (response.status === 'success') {
+          if (isOptimisticText) {
+            const confirmedMessage = formatMessageFromApi(response.message, 'sent');
+            setMessages(prev => {
+              const roomMsgs = prev[roomId] || [];
+              const withoutTemp = roomMsgs.filter(message => message.id !== tempId);
+              const hasConfirmed = withoutTemp.some(message => message.id === confirmedMessage.id);
+              return {
+                ...prev,
+                [roomId]: hasConfirmed ? withoutTemp : [...withoutTemp, confirmedMessage]
+              };
+            });
+          }
           // Socket sẽ tự broadcast lại tin nhắn qua receive_message, 
           // nhưng ta vẫn cần lấy ID ngay lập tức để lưu File
           resolve(response.message);
         } else {
+          if (isOptimisticText) {
+            setMessages(prev => ({
+              ...prev,
+              [roomId]: (prev[roomId] || []).map(message => (
+                message.id === tempId
+                  ? { ...message, isUploading: false, uploadError: response.error || 'Send failed' }
+                  : message
+              ))
+            }));
+          }
           reject(new Error(response.error || 'Lỗi gửi tin nhắn'));
         }
       });
