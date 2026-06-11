@@ -337,7 +337,6 @@ export function ChatLayout({
 
       clearPendingAttachments();
       closeImageViewer();
-      setShowInfo(false);
       setReplyTo(null);
       setSelectedConvId(event.data.roomId, event.data.messageId);
       setMobileShowChat(true);
@@ -398,7 +397,6 @@ export function ChatLayout({
     closeImageViewer();
     setSelectedConvId(id);
     setMobileShowChat(true);
-    setShowInfo(false);
     setReplyTo(null);
     setShowConversationSearch(false);
     setConversationSearchQuery('');
@@ -407,7 +405,6 @@ export function ChatLayout({
   const startDirectChat = async (userId: string) => {
     clearPendingAttachments();
     closeImageViewer();
-    setShowInfo(false);
     setReplyTo(null);
     setShowConversationSearch(false);
     setConversationSearchQuery('');
@@ -429,7 +426,6 @@ export function ChatLayout({
     if (!selectedConv) return;
     setShowConversationSearch(true);
     setShowRoomMenu(false);
-    setShowInfo(false);
     window.setTimeout(() => conversationSearchInputRef.current?.focus(), 0);
   };
 
@@ -442,7 +438,6 @@ export function ChatLayout({
     try {
       clearPendingAttachments();
       closeImageViewer();
-      setShowInfo(false);
       setReplyTo(null);
       await leaveRoom(selectedConv.id);
       setSelectedConvId(null);

@@ -148,7 +148,11 @@ const getFirstFile = (files: any) => Array.isArray(files) ? files[0] : files;
 
 const formatMessageFromApi = (m: any, status: Message['status'] = 'sent'): Message => {
   const file = getFirstFile(m.files);
-  const validReply = Boolean(m.reply_to?.id && (m.reply_to.content || m.reply_to.type));
+  const replyObj = Array.isArray(m.reply_to) ? m.reply_to[0] : m.reply_to;
+  const validReply = Boolean(replyObj?.id && (replyObj?.content || replyObj?.type));
+  const replyUser = replyObj?.users;
+  const replyUserName = Array.isArray(replyUser) ? replyUser[0]?.name : replyUser?.name;
+
   return {
     id: m.id,
     conversationId: m.room_id,
@@ -165,12 +169,12 @@ const formatMessageFromApi = (m: any, status: Message['status'] = 'sent'): Messa
     fileUrl: file ? getFilePreviewUrl(file) : undefined,
     isPinned: Boolean(m.is_pinned),
     reactions: formatReactions(m.reactions),
-    replyToId: validReply ? (m.reply_to_id || m.reply_to?.id) : undefined,
+    replyToId: m.reply_to_id || (validReply ? replyObj.id : undefined),
     replyTo: m.content === '__MESSAGE_RECALLED__' || !validReply ? undefined : {
-      id: m.reply_to.id,
-      content: m.reply_to.content,
-      type: m.reply_to.type,
-      userName: m.reply_to.users?.name || ''
+      id: replyObj.id,
+      content: replyObj.content,
+      type: replyObj.type,
+      userName: replyUserName || ''
     }
   };
 };

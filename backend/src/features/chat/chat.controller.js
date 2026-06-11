@@ -59,15 +59,17 @@ exports.createRoom = catchAsync(async (req, res, next) => {
     });
   }
 
-  io.to(allMembers).emit('group_created', result.room);
-  io.to(allMembers).emit('room_members_updated', {
-    roomId: result.room.id,
-    participants: allMembers,
-    memberCount: allMembers.length
+  allMembers.forEach(memberId => {
+    io.to(memberId).emit('group_created', result.room);
+    io.to(memberId).emit('room_members_updated', {
+      roomId: result.room.id,
+      participants: allMembers,
+      memberCount: allMembers.length
+    });
+    if (systemMessage) {
+      io.to(memberId).emit('receive_message', systemMessage);
+    }
   });
-  if (systemMessage) {
-    io.to(allMembers).emit('receive_message', systemMessage);
-  }
 
   res.status(201).json({
     status: 'success',
@@ -102,12 +104,14 @@ exports.leaveRoom = catchAsync(async (req, res, next) => {
       content: `${req.user.name} đã rời nhóm`
     });
 
-    io.to(remainingMemberIds).emit('room_members_updated', {
-      roomId: req.params.roomId,
-      participants: remainingMemberIds,
-      memberCount: result.memberCount
+    remainingMemberIds.forEach(memberId => {
+      io.to(memberId).emit('room_members_updated', {
+        roomId: req.params.roomId,
+        participants: remainingMemberIds,
+        memberCount: result.memberCount
+      });
+      io.to(memberId).emit('receive_message', systemMessage);
     });
-    io.to(remainingMemberIds).emit('receive_message', systemMessage);
   }
 
   res.status(200).json({
