@@ -352,33 +352,7 @@ export function MessageBubble({
                 >
                   <Download className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={async () => {
-                    if (!(msg as any).fileId) {
-                      alert('Đang xử lý file, vui lòng thử lại sau!');
-                      return;
-                    }
-                    try {
-                      const res = await fetch(`${import.meta.env.VITE_API_URL}/files/${(msg as any).fileId}/download`, {
-                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                      });
-                      const data = await res.json();
-                      if (data?.data?.downloadUrl) {
-                        const a = document.createElement('a');
-                        a.href = data.data.downloadUrl;
-                        a.click();
-                      } else {
-                        throw new Error('Không lấy được link tải');
-                      }
-                    } catch (e) {
-                      alert('Lỗi khi tải file!');
-                    }
-                  }}
-                  className={`hidden flex-shrink-0 p-1.5 rounded-lg transition-colors ${isMine ? 'hover:bg-green-500 text-green-100' : 'hover:bg-gray-100 text-gray-400'
-                    }`}
-                >
-                  <Download className="w-4 h-4" />
-                </button>
+
               </div>
             )}
 
