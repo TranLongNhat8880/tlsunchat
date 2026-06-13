@@ -6,7 +6,7 @@ const { getPasswordTokenVersion } = require('../../core/utils/tokenFingerprint')
 
 const DEFAULT_PASSWORD = '123456';
 
-const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || '8h';
+const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || '30d';
 
 const parseDurationMs = (value) => {
   if (typeof value === 'number') return value * 1000;
